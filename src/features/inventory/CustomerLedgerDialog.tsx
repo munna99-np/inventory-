@@ -226,7 +226,7 @@ export default function CustomerLedgerDialog({ open, onOpenChange }: CustomerLed
               </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto px-4 py-6 sm:px-6">
+            <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 py-6 sm:px-6">
               {!selectedSummary ? (
                 <div className="space-y-5">
                   <div className="sticky top-0 z-10 space-y-3 bg-white pb-4">

@@ -400,6 +400,12 @@ function computePartyLedgerSummary(
 
     if (entry.entryType === 'sale') {
       totalSold += directionSign * amount
+      // Treat immediate payments made at sale time as payments received
+      // based on the selected payment method. Credit should not count as payment.
+      if (entry.paymentMethod === 'cash' || entry.paymentMethod === 'online' || entry.paymentMethod === 'cheque') {
+        // Only count positive inflows as received payments
+        if (entry.direction === 'in') paymentsReceived += amount
+      }
     } else if (entry.entryType === 'purchase') {
       totalPurchased += directionSign * amount
     } else if (entry.entryType === 'payment') {

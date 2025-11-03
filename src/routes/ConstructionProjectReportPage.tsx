@@ -477,34 +477,60 @@ export default function ConstructionProjectReportPage() {
 
       const inflowHighlights =
         categoryBreakdown.inflow.rows.length > 0
-          ? categoryBreakdown.inflow.rows.slice(0, 3)
+          ? categoryBreakdown.inflow.rows.slice(0, 4)
           : null
       const outflowHighlights =
         categoryBreakdown.outflow.rows.length > 0
-          ? categoryBreakdown.outflow.rows.slice(0, 3)
+          ? categoryBreakdown.outflow.rows.slice(0, 4)
           : null
+
+      const boxGap = 16
+      const boxWidth = (contentWidth - boxGap) / 2
+      const boxHeight = 18 + 4 * 18 + 16 // header + up to 4 rows + padding
+      const leftBoxX = margin
+      const rightBoxX = margin + boxWidth + boxGap
 
       if (!inflowHighlights && !outflowHighlights) {
         doc.text('No category activity recorded yet.', margin, cursorY)
         cursorY += 16
       } else {
+        // Inflow box
         if (inflowHighlights) {
-          doc.text('Top inflow categories:', margin, cursorY)
-          cursorY += 14
-          inflowHighlights.forEach((row) => {
-            doc.text(`• ${row.label} — ${formatCurrency(row.amount)}`, margin + 12, cursorY)
-            cursorY += 14
+          doc.setFillColor(236, 253, 245)
+          doc.setDrawColor(167, 243, 208)
+          doc.roundedRect(leftBoxX, cursorY, boxWidth, boxHeight, 8, 8, 'FD')
+          doc.setFont('helvetica', 'bold')
+          doc.setTextColor(6, 95, 70)
+          doc.text('Top inflow categories', leftBoxX + 12, cursorY + 16)
+          doc.setFont('helvetica', 'normal')
+          doc.setTextColor(15, 23, 42)
+          inflowHighlights.forEach((row, idx) => {
+            const y = cursorY + 16 + 14 + idx * 18
+            doc.text(`${row.label}`, leftBoxX + 12, y)
+            const amount = formatCurrency(row.amount)
+            doc.text(amount, leftBoxX + boxWidth - 12, y, { align: 'right' })
           })
         }
+
+        // Outflow box
         if (outflowHighlights) {
-          cursorY += 6
-          doc.text('Top spending categories:', margin, cursorY)
-          cursorY += 14
-          outflowHighlights.forEach((row) => {
-            doc.text(`• ${row.label} — ${formatCurrency(row.amount)}`, margin + 12, cursorY)
-            cursorY += 14
+          doc.setFillColor(254, 242, 242)
+          doc.setDrawColor(254, 202, 202)
+          doc.roundedRect(rightBoxX, cursorY, boxWidth, boxHeight, 8, 8, 'FD')
+          doc.setFont('helvetica', 'bold')
+          doc.setTextColor(153, 27, 27)
+          doc.text('Top spending categories', rightBoxX + 12, cursorY + 16)
+          doc.setFont('helvetica', 'normal')
+          doc.setTextColor(15, 23, 42)
+          outflowHighlights.forEach((row, idx) => {
+            const y = cursorY + 16 + 14 + idx * 18
+            doc.text(`${row.label}`, rightBoxX + 12, y)
+            const amount = formatCurrency(row.amount)
+            doc.text(amount, rightBoxX + boxWidth - 12, y, { align: 'right' })
           })
         }
+
+        cursorY += boxHeight + 16
       }
 
       cursorY += 16
@@ -551,12 +577,12 @@ export default function ConstructionProjectReportPage() {
 
         const columns: { key: keyof TableRow; header: string; width: number; align: 'left' | 'right' }[] = [
           { key: 'index', header: '#', width: 24, align: 'left' },
-          { key: 'date', header: 'Date', width: 80, align: 'left' },
+          { key: 'date', header: 'Date', width: 72, align: 'left' },
           { key: 'typeLabel', header: 'Type', width: 86, align: 'left' },
-          { key: 'amount', header: 'Amount', width: 78, align: 'right' },
-          { key: 'account', header: 'Account', width: 128, align: 'left' },
-          { key: 'category', header: 'Category', width: 126, align: 'left' },
-          { key: 'notes', header: 'Notes', width: contentWidth - (24 + 80 + 86 + 78 + 128 + 126), align: 'left' },
+          { key: 'amount', header: 'Amount', width: 82, align: 'right' },
+          { key: 'account', header: 'Account', width: 120, align: 'left' },
+          { key: 'category', header: 'Category', width: 112, align: 'left' },
+          { key: 'notes', header: 'Notes', width: contentWidth - (24 + 72 + 86 + 82 + 120 + 112), align: 'left' },
         ]
 
         const rows: TableRow[] = sortedFlows.slice(0, 60).map((flow, index) => {
@@ -605,9 +631,10 @@ export default function ConstructionProjectReportPage() {
 
         rows.forEach((row) => {
           const typeMeta = typePalette[row.type]
-          const cellLines: string[][] = columns.map((column) =>
-            doc.splitTextToSize(row[column.key], column.width - 14) as string[]
-          )
+          const cellLines: string[][] = columns.map((column) => {
+            const text = String(row[column.key] ?? '')
+            return doc.splitTextToSize(text, column.width - 12) as string[]
+          })
           const lineCount = Math.max(...cellLines.map((lines) => Math.max(lines.length, 1)))
           const rowHeight = lineCount * rowLineHeight + 10
 

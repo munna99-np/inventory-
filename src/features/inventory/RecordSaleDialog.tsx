@@ -238,22 +238,27 @@ export default function RecordSaleDialog({ open, onOpenChange, onSaleComplete }:
       return
     }
     const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' })
+    const marginLeft = 40
+    const marginTop = 60
+
     const now = new Date()
     const title = selectedPartyName || 'Walk-in customer'
     doc.setFont('helvetica', 'bold')
     doc.setFontSize(20)
-    doc.text('Sales Invoice', 40, 60)
+    doc.text('Sales Invoice', marginLeft, marginTop)
 
     doc.setFont('helvetica', 'normal')
     doc.setFontSize(11)
     doc.setTextColor(80)
-    doc.text(`Invoice #: ${invoiceNo}`, 40, 82)
-    doc.text(`Date: ${formatDateTime(now)}`, 40, 100)
-    doc.text(`Customer: ${title || 'Walk-in customer'}`, 40, 118)
-    doc.text(`Total amount: ${formatCurrency(totalAmount)}`, 40, 136)
+    doc.text(`Invoice #: ${invoiceNo}`, marginLeft, marginTop + 22)
+    doc.text(`Date: ${formatDateTime(now)}`, marginLeft, marginTop + 40)
+    doc.text(`Customer: ${title || 'Walk-in customer'}`, marginLeft, marginTop + 58)
+    doc.text(`Payment method: ${paymentMethod}`, marginLeft, marginTop + 76)
+    doc.text(`Total amount: ${formatCurrency(totalAmount)}`, marginLeft, marginTop + 94)
 
     autoTable(doc, {
-      startY: 160,
+      startY: marginTop + 118,
+      margin: { left: marginLeft, right: marginLeft },
       head: [['Item', 'Quantity', 'Price', 'Line total']],
       body: lines.map((line) => [
         line.name,
@@ -269,8 +274,8 @@ export default function RecordSaleDialog({ open, onOpenChange, onSaleComplete }:
 
     doc.setFont('helvetica', 'bold')
     doc.setTextColor(40)
-    const summaryY = (doc as any).lastAutoTable?.finalY ?? 160
-    doc.text(`Grand total: ${formatCurrency(totalAmount)}`, 40, summaryY + 32)
+    const summaryY = (doc as any).lastAutoTable?.finalY ?? (marginTop + 118)
+    doc.text(`Grand total: ${formatCurrency(totalAmount)}`, marginLeft, summaryY + 28)
 
     doc.save(`${slugify(title || 'invoice')}.pdf`)
   }

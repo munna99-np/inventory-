@@ -10,11 +10,11 @@ import MoneyInput from '../components/fields/MoneyInput'
 import { useCategories } from '../hooks/useCategories'
 import { formatCurrency } from '../lib/format'
 import { formatAppDate } from '../lib/date'
-import { cn } from '../lib/utils'
 import { getProjectProfile, recordProjectFlow } from '../services/projects'
 import type { ProjectProfile } from '../types/projects'
 import type { Category } from '../types/categories'
 import { TextField } from '@mui/material'
+import CategoryTree, { type CategoryTreeItem } from '../components/category/CategoryTree'
 
 type FormState = {
   accountId: string
@@ -42,6 +42,34 @@ function buildCategoryPath(id: string, map: Map<string, Category>): string {
     current = current.parent_id ? map.get(current.parent_id) : undefined
   }
   return parts.join(' / ')
+}
+
+function buildCategoryTreeItems(categories: Category[]): CategoryTreeItem[] {
+  const byParent = new Map<string | null, Category[]>()
+  categories.forEach((cat) => {
+    const key = (cat.parent_id as string | null) ?? null
+    const list = byParent.get(key) ?? []
+    list.push(cat)
+    byParent.set(key, list)
+  })
+  const toItem = (cat: Category): CategoryTreeItem => ({
+    id: cat.id,
+    label: cat.name,
+    children: (byParent.get(cat.id) ?? []).map(toItem),
+  })
+  const roots = byParent.get(null) ?? byParent.get(undefined as any) ?? []
+  return roots.map(toItem)
+}
+
+function defaultExpandedFromSelection(selectedId: string, map: Map<string, Category>): string[] {
+  if (!selectedId) return []
+  const ids: string[] = []
+  let current = map.get(selectedId)
+  while (current) {
+    ids.unshift(current.id)
+    current = current.parent_id ? map.get(current.parent_id) : undefined
+  }
+  return ids
 }
 
 function createEmptyForm(): FormState {
@@ -244,32 +272,14 @@ export default function ConstructionPaymentOutPage() {
                     className="flex-1 bg-transparent text-sm focus:outline-none"
                   />
                 </div>
-                <div className="max-h-48 overflow-y-auto">
-                  {filteredCategories.length === 0 ? (
-                    <p className="p-3 text-xs text-muted-foreground">No categories found.</p>
-                  ) : (
-                    <ul className="divide-y divide-border/60">
-                      {filteredCategories.map((category) => {
-                        const path = buildCategoryPath(category.id, categoriesMap)
-                        const active = form.categoryId === category.id
-                        return (
-                          <li key={category.id}>
-                            <button
-                              type="button"
-                              onClick={() => setForm((prev) => ({ ...prev, categoryId: category.id }))}
-                              className={cn(
-                                'flex w-full items-center justify-between px-3 py-2 text-left text-xs transition',
-                                active ? 'bg-primary/10 font-medium text-foreground' : 'hover:bg-muted/30'
-                              )}
-                            >
-                              <span>{path}</span>
-                              {active ? <span className="text-[10px] uppercase text-primary">Selected</span> : null}
-                            </button>
-                          </li>
-                        )
-                      })}
-                    </ul>
-                  )}
+                <div className="p-2">
+                  <CategoryTree
+                    items={buildCategoryTreeItems(filteredCategories)}
+                    defaultExpandedIds={defaultExpandedFromSelection(form.categoryId, categoriesMap)}
+                    onSelect={(id) => setForm((prev) => ({ ...prev, categoryId: id || '' }))}
+                    height={280}
+                    width={320}
+                  />
                 </div>
                 {selectedCategoryName ? (
                   <div className="border-t border-border/60 px-3 py-2 text-xs text-muted-foreground">

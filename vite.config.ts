@@ -12,52 +12,52 @@ const nodePolyfills = {
 export default defineConfig(({ mode }) => {
   // Load env file based on `mode` in the current working directory.
   const env = loadEnv(mode, process.cwd(), '')
+  const isElectron = process.env.BUILD_ELECTRON === 'true'
   
   return {
   base: './', // Required for Electron file:// protocol
   plugins: [
     react(),
-    electron([
-      {
-        // Main-Process entry file of the Electron App.
-        entry: 'electron-main.ts',
-        onstart(options) {
-          // Notify the Renderer-Process to reload the page when the Main-Process builds successfully.
-          options.reload()
-        },
-        vite: {
-          build: {
-            sourcemap: true,
-            minify: process.env.NODE_ENV === 'production',
-            outDir: 'dist-electron',
-            rollupOptions: {
-              external: ['electron'],
+    ...(isElectron
+      ? [
+          electron([
+            {
+              // Main-Process entry file of the Electron App.
+              entry: 'electron-main.ts',
+              onstart(options) {
+                options.reload()
+              },
+              vite: {
+                build: {
+                  sourcemap: true,
+                  minify: process.env.NODE_ENV === 'production',
+                  outDir: 'dist-electron',
+                  rollupOptions: {
+                    external: ['electron'],
+                  },
+                },
+              },
             },
-          },
-        },
-      },
-      {
-        entry: 'preload.ts',
-        onstart(options) {
-          // Notify the Renderer-Process to reload the page when the Preload-Scripts build successfully.
-          options.reload()
-        },
-        vite: {
-          build: {
-            sourcemap: 'inline',
-            minify: process.env.NODE_ENV === 'production',
-            outDir: 'dist-electron',
-            rollupOptions: {
-              external: ['electron'],
+            {
+              entry: 'preload.ts',
+              onstart(options) {
+                options.reload()
+              },
+              vite: {
+                build: {
+                  sourcemap: 'inline',
+                  minify: process.env.NODE_ENV === 'production',
+                  outDir: 'dist-electron',
+                  rollupOptions: {
+                    external: ['electron'],
+                  },
+                },
+              },
             },
-          },
-        },
-      },
-    ]),
-    // Use Node.js API in the Renderer-process
-    renderer({
-      nodeIntegration: false,
-    }),
+          ]),
+          renderer({ nodeIntegration: false }),
+        ]
+      : []),
   ],
   resolve: {
     alias: nodePolyfills,

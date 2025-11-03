@@ -1,5 +1,6 @@
 
 import { useMemo, useState } from 'react'
+import CategoryTree, { type CategoryTreeItem } from '../components/category/CategoryTree'
 import clsx from 'clsx'
 import { subDays } from 'date-fns'
 import { Link } from 'react-router-dom'
@@ -99,6 +100,7 @@ export default function TransactionsPage() {
   const { data: accounts } = useAccounts()
   const { data: parties } = useParties()
   const { data: categories } = useCategories()
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string>('')
 
   const directionFilter = useMemo(() => {
     if (segment === 'received') return 'in' as const
@@ -145,9 +147,23 @@ export default function TransactionsPage() {
     return decorated.filter((tx) => {
       if (segment === 'withdraw') return isWithdraw(tx)
       if (segment === 'payment') return tx.direction === 'out' && !isWithdraw(tx)
+      if (selectedCategoryId) return tx.category_id === selectedCategoryId
       return true
     })
-  }, [decorated, segment])
+  }, [decorated, segment, selectedCategoryId])
+
+  const categoryTreeItems = useMemo<CategoryTreeItem[]>(() => {
+    const byParent = new Map<string | null, { id: string; name: string; parent_id?: string | null }[]>()
+    categories.forEach((c) => {
+      const key = (c.parent_id as string | null) ?? null
+      const list = byParent.get(key) ?? []
+      list.push(c)
+      byParent.set(key, list)
+    })
+    const toItem = (c: { id: string; name: string }): CategoryTreeItem => ({ id: c.id, label: c.name, children: (byParent.get(c.id) ?? []).map(toItem) })
+    const roots = byParent.get(null) ?? byParent.get(undefined as any) ?? []
+    return roots.map(toItem)
+  }, [categories])
 
   const summary = useMemo(() => {
     let received = 0
@@ -346,10 +362,19 @@ export default function TransactionsPage() {
       </Card>
 
       <div className="rounded-3xl border bg-white/90 shadow-sm">
-        <div className="flex items-center justify-between border-b px-6 py-4">
+        <div className="flex flex-col gap-3 border-b px-6 py-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <h2 className="text-lg font-semibold">Transaction Activity</h2>
             <p className="text-sm text-muted-foreground">Detailed ledger of every movement in the selected period.</p>
+          </div>
+          <div className="rounded-xl border bg-white p-2">
+            <CategoryTree
+              items={categoryTreeItems}
+              defaultExpandedIds={[]}
+              onSelect={(id) => setSelectedCategoryId(id || '')}
+              height={220}
+              width={260}
+            />
           </div>
         </div>
         <div className="max-h-[520px] overflow-auto">

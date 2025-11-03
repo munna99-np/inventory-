@@ -56,25 +56,30 @@ const buildDownloadTitle = (entry: BillingHistoryEntry) => {
 
 const downloadInvoice = (entry: BillingHistoryEntry) => {
   const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' })
+  const marginLeft = 40
+  const marginTop = 60
+  const gray = 80
+
   const date = new Date(entry.invoiceDate)
   const friendlyDate = Number.isNaN(date.getTime()) ? entry.invoiceDate : formatAppDateTime(date)
   const title = entry.partyName || 'Walk-in customer'
 
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(20)
-  doc.text('Sales Invoice', 40, 60)
+  doc.text('Sales Invoice', marginLeft, marginTop)
 
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(11)
-  doc.setTextColor(80)
-  doc.text(`Invoice #: ${entry.invoiceNo}`, 40, 82)
-  doc.text(`Date: ${friendlyDate}`, 40, 100)
-  doc.text(`Customer: ${title}`, 40, 118)
-  doc.text(`Total amount: ${formatCurrency(entry.totalAmount)}`, 40, 136)
-  doc.text(`Payment method: ${paymentLabels[entry.paymentMethod] ?? entry.paymentMethod}`, 40, 154)
+  doc.setTextColor(gray)
+  doc.text(`Invoice #: ${entry.invoiceNo}`, marginLeft, marginTop + 22)
+  doc.text(`Date: ${friendlyDate}`, marginLeft, marginTop + 40)
+  doc.text(`Customer: ${title}`, marginLeft, marginTop + 58)
+  doc.text(`Payment method: ${paymentLabels[entry.paymentMethod] ?? entry.paymentMethod}`, marginLeft, marginTop + 76)
+  doc.text(`Total amount: ${formatCurrency(entry.totalAmount)}`, marginLeft, marginTop + 94)
 
   autoTable(doc, {
-    startY: 178,
+    startY: marginTop + 118,
+    margin: { left: marginLeft, right: marginLeft },
     head: [['Item', 'Quantity', 'Price', 'Line total']],
     body: entry.items.map((line: BillingHistoryLine) => [
       line.name,
@@ -90,8 +95,8 @@ const downloadInvoice = (entry: BillingHistoryEntry) => {
 
   doc.setFont('helvetica', 'bold')
   doc.setTextColor(40)
-  const summaryY = (doc as any).lastAutoTable?.finalY ?? 178
-  doc.text(`Grand total: ${formatCurrency(entry.totalAmount)}`, 40, summaryY + 32)
+  const summaryY = (doc as any).lastAutoTable?.finalY ?? (marginTop + 118)
+  doc.text(`Grand total: ${formatCurrency(entry.totalAmount)}`, marginLeft, summaryY + 28)
 
   doc.save(`${buildDownloadTitle(entry)}.pdf`)
 }

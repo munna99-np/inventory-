@@ -218,25 +218,29 @@ export default function AccountStatementPage() {
     if (!account) return
 
     const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' })
+    const marginLeft = 40
+    const marginTop = 60
+
     doc.setFont('helvetica', 'bold')
     doc.setFontSize(20)
-    doc.text(`${account.name} - Statement`, 40, 60)
+    doc.text(`${account.name} - Statement`, marginLeft, marginTop)
 
     doc.setFont('helvetica', 'normal')
     doc.setFontSize(11)
     doc.setTextColor(80)
-    doc.text(`Generated on ${formatDateTime(new Date())}`, 40, 82)
-    doc.text(`Period: ${pdfPeriodLabel}`, 40, 100)
+    doc.text(`Generated on ${formatDateTime(new Date())}`, marginLeft, marginTop + 22)
+    doc.text(`Period: ${pdfPeriodLabel}`, marginLeft, marginTop + 40)
     doc.text(
       `Entries: ${summary.entryCount} (Transactions: ${summary.transactionCount}, Transfers: ${summary.transferCount})`,
-      40,
-      118,
+      marginLeft,
+      marginTop + 58,
     )
 
     autoTable(doc, {
-      startY: 140,
+      startY: marginTop + 80,
       theme: 'plain',
       styles: { fontSize: 11, cellPadding: 6, textColor: [45, 55, 72] },
+      margin: { left: marginLeft, right: marginLeft },
       columnStyles: {
         0: { fontStyle: 'bold', textColor: [30, 41, 59] },
         1: { halign: 'right' },
@@ -251,14 +255,15 @@ export default function AccountStatementPage() {
     })
 
     const docAny = doc as any
-    const nextY = (docAny.lastAutoTable?.finalY ?? 140) + 24
+    const nextY = (docAny.lastAutoTable?.finalY ?? marginTop + 80) + 24
 
     if (timeline.length === 0) {
       doc.setTextColor(100)
-      doc.text('No activity recorded in this period.', 40, nextY)
+      doc.text('No activity recorded in this period.', marginLeft, nextY)
     } else {
       autoTable(doc, {
         startY: nextY,
+        margin: { left: marginLeft, right: marginLeft },
         head: [['Date', 'Direction', 'Counterparty', 'Amount', 'Notes']],
         body: timeline.map((row) => [
           formatDateDisplay(row.date),
@@ -271,6 +276,19 @@ export default function AccountStatementPage() {
         headStyles: { fillColor: [76, 92, 205], textColor: 255, fontStyle: 'bold' },
         alternateRowStyles: { fillColor: [245, 247, 255] },
         columnStyles: { 3: { halign: 'right' } },
+        didParseCell: (data) => {
+          if (data.section === 'body') {
+            const dir = data.table.body[data.row.index]?.cells?.[1]?.text?.[0]
+            const isIncoming = dir === 'Incoming'
+            // Amount column index 3
+            if (data.column.index === 3) {
+              data.cell.styles.textColor = isIncoming ? [16, 128, 67] : [220, 38, 38]
+              data.cell.text = [
+                `${isIncoming ? '+' : '-'}${data.cell.text?.[0] ?? ''}`,
+              ]
+            }
+          }
+        },
       })
     }
 
