@@ -1,18 +1,16 @@
 {
   "version": 2,
+  "builds": [
+    {
+      "src": "package.json",
+      "use": "@vercel/static-build",
+      "config": { "distDir": "dist" }
+    }
+  ],
   "buildCommand": "npm run build",
   "installCommand": "npm ci",
-  "outputDirectory": "dist",
-  "framework": null,
-  "env": {
-    "NODE_VERSION": "20"
-  }
-}
-{
-  "rewrites": [
-    {
-      "source": "/((?!.*\\.).*)",
-      "destination": "/index.html"
-    }
+  "routes": [
+    { "handle": "filesystem" },
+    { "src": "/.*", "dest": "/index.html" }
   ]
 }
