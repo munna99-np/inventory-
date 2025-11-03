@@ -37,6 +37,7 @@ export default function InventoryPurchasesPage() {
   const [historyLines, setHistoryLines] = useState<any[]>([])
   const [itemId, setItemId] = useState<string>('')
   const [items, setItems] = useState<any[]>([])
+  const [itemsLoading, setItemsLoading] = useState(false)
 
   useEffect(() => {
     const run = async () => {
@@ -47,19 +48,41 @@ export default function InventoryPurchasesPage() {
     run()
   }, [partyId])
 
-  // Load items for subcategory (unpaginated) to drive item history select
+  // Load items for subcategory OR entire category if sub not selected
   useEffect(() => {
     let active = true
     ;(async () => {
-      if (!subId) { setItems([]); setItemId(''); return }
-      // lazy import of service to avoid circular dep
-      const mod = await import('../services/inventoryItems')
-      const rows = await mod.listItems(subId)
-      if (!active) return
-      setItems(rows)
+      setItemsLoading(true)
+      try {
+        // If subcategory is selected, fetch items for that subcategory
+        if (subId) {
+          const mod = await import('../services/inventoryItems')
+          const rows = await mod.listItems(subId)
+          if (!active) return
+          setItems(rows)
+          return
+        }
+        // If category is selected but no subcategory, aggregate items from all subs under the category
+        if (catId) {
+          const subIds = (subs as any[]).map((s: any) => s.id)
+          if (subIds.length === 0) { if (active) setItems([]); return }
+          const mod = await import('../services/inventoryItems')
+          const lists = await Promise.all(subIds.map((sid) => mod.listItems(sid)))
+          if (!active) return
+          setItems(lists.flat())
+          return
+        }
+        // No category/sub selected
+        if (active) {
+          setItems([])
+          setItemId('')
+        }
+      } finally {
+        if (active) setItemsLoading(false)
+      }
     })()
     return () => { active = false }
-  }, [subId])
+  }, [subId, catId, subs])
 
   return (
     <div className="space-y-4">
@@ -93,6 +116,7 @@ export default function InventoryPurchasesPage() {
                 <SelectValue placeholder={catId ? 'Select subcategory' : 'Choose category first'} />
               </SelectTrigger>
               <SelectContent>
+                {catId ? <SelectItem value="none">All in category</SelectItem> : null}
                 {(subs as any[]).map((s: any) => (
                   <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
                 ))}
@@ -106,8 +130,8 @@ export default function InventoryPurchasesPage() {
           <div className="w-full sm:w-[16rem]">
             <label className="text-sm">Select Item</label>
             <Select value={itemId || 'none'} onValueChange={(v) => setItemId(v === 'none' ? '' : v)}>
-              <SelectTrigger className="h-9" disabled={!subId}>
-                <SelectValue placeholder={subId ? 'Select item' : 'Choose subcategory first'} />
+              <SelectTrigger className="h-9" disabled={!catId && !subId}>
+                <SelectValue placeholder={itemsLoading ? 'Loading items…' : (subId ? 'Select item' : catId ? 'Select item (all subs)' : 'Choose category first')} />
               </SelectTrigger>
               <SelectContent>
                 {(items as any[])
