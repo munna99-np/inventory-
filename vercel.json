@@ -1,4 +1,14 @@
 {
+  "version": 2,
+  "buildCommand": "npm run build",
+  "installCommand": "npm ci",
+  "outputDirectory": "dist",
+  "framework": null,
+  "env": {
+    "NODE_VERSION": "20"
+  }
+}
+{
   "rewrites": [
     {
       "source": "/((?!.*\\.).*)",
