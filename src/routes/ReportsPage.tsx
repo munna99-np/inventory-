@@ -435,7 +435,7 @@ export default function ReportsPage() {
               <IconReports size={16} />
               Smart Reports
             </span>
-            <h1 className="text-2xl font-semibold md:text-3xl">Insightful reports for every decision</h1>
+            <h1 className="text-lg sm:text-xl md:text-2xl font-semibold">Insightful reports for every decision</h1>
             <p className="text-sm text-slate-300 md:text-base">
               Explore detailed inflow and outflow trends, compare accounts and stakeholders, and export polished summaries for your records.
             </p>

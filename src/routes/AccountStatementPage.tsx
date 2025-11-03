@@ -328,7 +328,7 @@ export default function AccountStatementPage() {
         <div className="relative space-y-8 p-8">
           <div className="space-y-2">
             <p className="text-xs uppercase tracking-[0.25em] text-white/60">Account statement</p>
-            <h1 className="text-3xl font-semibold md:text-4xl">{account?.name || 'Loading account...'}</h1>
+            <h1 className="text-xl sm:text-2xl md:text-3xl font-semibold">{account?.name || 'Loading account...'}</h1>
             <p className="text-sm text-white/70">Statement period: {periodLabel}. {activityHeadline}</p>
           </div>
 

@@ -1,38 +1,45 @@
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabaseClient'
+import { useAuth } from '../lib/auth'
 
 export function useInvCategories() {
+  const { user } = useAuth()
   const [data, setData] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const refetch = async () => {
+    if (!user?.id) return
     setLoading(true)
     const { data, error } = await supabase
       .from('inventory_categories')
       .select(
         'id,name,created_at, inventory_subcategories:inventory_subcategories!inventory_subcategories_category_id_fkey(id)'
       )
+      .eq('owner', user.id)
       .order('name')
     if (error) setError(error.message)
     const rows = (data || []).map((c: any) => ({ id: c.id, name: c.name, subCount: c.inventory_subcategories?.length || 0 }))
     setData(rows)
     setLoading(false)
   }
-  useEffect(() => { refetch() }, [])
+  useEffect(() => { refetch() }, [user?.id])
   return { data, loading, error, refetch }
 }
 
 export function useInvSubcategories(categoryId?: string) {
+  const { user } = useAuth()
   const [data, setData] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const refetch = async () => {
+    if (!user?.id) return
     setLoading(true)
     let q = supabase
       .from('inventory_subcategories')
       .select(
         'id,category_id,name,created_at, inventory_items:inventory_items!inventory_items_subcategory_id_fkey(id)'
       )
+      .eq('owner', user.id)
     if (categoryId) q = q.eq('category_id', categoryId)
     q = q.order('name')
     const { data, error } = await q
@@ -41,12 +48,13 @@ export function useInvSubcategories(categoryId?: string) {
     setData(rows)
     setLoading(false)
   }
-  useEffect(() => { refetch() }, [categoryId])
+  useEffect(() => { refetch() }, [categoryId, user?.id])
   return { data, loading, error, refetch }
 }
 
 export type ItemFilters = { subcategoryId?: string; search?: string; page?: number }
 export function useInvItems(filters: ItemFilters = {}) {
+  const { user } = useAuth()
   const [data, setData] = useState<any[]>([])
   const [total, setTotal] = useState<number>(0)
   const [loading, setLoading] = useState(true)
@@ -54,8 +62,9 @@ export function useInvItems(filters: ItemFilters = {}) {
   const limit = 20
   const deps = useMemo(() => JSON.stringify(filters), [filters])
   const refetch = async () => {
+    if (!user?.id) return
     setLoading(true)
-    let q = supabase.from('inventory_items').select('*', { count: 'exact' })
+    let q = supabase.from('inventory_items').select('*', { count: 'exact' }).eq('owner', user.id)
     if (filters.subcategoryId) q = q.eq('subcategory_id', filters.subcategoryId)
     if (filters.search) {
       const s = `%${filters.search}%`
@@ -71,17 +80,18 @@ export function useInvItems(filters: ItemFilters = {}) {
     setTotal(count || 0)
     setLoading(false)
   }
-  useEffect(() => { refetch() }, [deps])
+  useEffect(() => { refetch() }, [deps, user?.id])
   return { data, total, loading, error, refetch, limit }
 }
 
 export function useInvItemDetails(itemId?: string) {
+  const { user } = useAuth()
   const [item, setItem] = useState<any | null>(null)
   const [purchases, setPurchases] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   useEffect(() => {
-    if (!itemId) return
+    if (!itemId || !user?.id) return
     let active = true
     ;(async () => {
       setLoading(true)
@@ -89,6 +99,7 @@ export function useInvItemDetails(itemId?: string) {
         .from('inventory_items')
         .select('id,name,sku,unit,price,stock,min_stock,notes, subcategory:inventory_subcategories(id,name, category:inventory_categories(id,name))')
         .eq('id', itemId)
+        .eq('owner', user.id)
         .single()
       if (!active) return
       if (e1) { setError(e1.message); setLoading(false); return }
@@ -104,23 +115,25 @@ export function useInvItemDetails(itemId?: string) {
       setLoading(false)
     })()
     return () => { active = false }
-  }, [itemId])
+  }, [itemId, user?.id])
   return { item, purchases, loading, error }
 }
 
 export function usePartySearch(query: string) {
+  const { user } = useAuth()
   const [data, setData] = useState<any[]>([])
   useEffect(() => {
+    if (!user?.id) return
     let active = true
     ;(async () => {
-      let q = supabase.from('parties').select('id,name,phone').order('name')
+      let q = supabase.from('parties').select('id,name,phone').eq('owner', user.id).order('name')
       if (query.trim()) q = q.ilike('name', `%${query}%`)
       const { data } = await q.limit(10)
       if (!active) return
       setData(data || [])
     })()
     return () => { active = false }
-  }, [query])
+  }, [query, user?.id])
   return { data }
 }
 

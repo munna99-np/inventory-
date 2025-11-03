@@ -334,11 +334,26 @@ function createProfileFromInput(input: CreateProjectProfileInput): ProjectProfil
   })
 }
 
-function readLocalProfiles(): ProjectProfile[] {
+async function getUserId(): Promise<string | null> {
+  try {
+    const { data: { session } } = await supabase.auth.getSession()
+    return session?.user?.id ?? null
+  } catch {
+    return null
+  }
+}
+
+async function getUserStorageKey(): Promise<string> {
+  const userId = await getUserId()
+  return userId ? `${PROFILE_STORAGE_KEY}:${userId}` : PROFILE_STORAGE_KEY
+}
+
+async function readLocalProfiles(): Promise<ProjectProfile[]> {
   const storage = getStorage()
   if (!storage) return []
   try {
-    const raw = storage.getItem(PROFILE_STORAGE_KEY)
+    const key = await getUserStorageKey()
+    const raw = storage.getItem(key)
     if (!raw) return []
     const parsed = JSON.parse(raw)
     if (!Array.isArray(parsed)) return []
@@ -348,11 +363,12 @@ function readLocalProfiles(): ProjectProfile[] {
   }
 }
 
-function persistLocalProfiles(list: ProjectProfile[]) {
+async function persistLocalProfiles(list: ProjectProfile[]) {
   const storage = getStorage()
   if (!storage) return
   try {
-    storage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(list.map((item) => ensureProfileDefaults(item))))
+    const key = await getUserStorageKey()
+    storage.setItem(key, JSON.stringify(list.map((item) => ensureProfileDefaults(item))))
   } catch {}
 }
 
@@ -369,11 +385,11 @@ function emitProjectsUpdated() {
 }
 
 export async function listProjectProfiles(): Promise<ProjectProfile[]> {
-  return sortProfiles(readLocalProfiles())
+  return sortProfiles(await readLocalProfiles())
 }
 
 export async function getProjectProfile(id: string): Promise<ProjectProfile | null> {
-  const profiles = readLocalProfiles()
+  const profiles = await readLocalProfiles()
   const found = profiles.find((p) => p.id === id)
   return found ? ensureProfileDefaults(found) : null
 }
@@ -382,9 +398,9 @@ export async function createProjectProfile(input: CreateProjectProfileInput): Pr
   const name = sanitizeString(input.name)
   if (!name) throw new Error('Project name is required')
   const profile = createProfileFromInput({ ...input, name })
-  const profiles = readLocalProfiles()
+  const profiles = await readLocalProfiles()
   const next = [profile, ...profiles]
-  persistLocalProfiles(next)
+  await persistLocalProfiles(next)
   emitProjectsUpdated()
   return profile
 }
@@ -393,7 +409,7 @@ export async function updateProjectProfile(
   id: string,
   patchOrUpdater: UpdateProjectProfilePatch | ((current: ProjectProfile) => UpdateProjectProfilePatch)
 ): Promise<ProjectProfile> {
-  const profiles = readLocalProfiles()
+  const profiles = await readLocalProfiles()
   const idx = profiles.findIndex((p) => p.id === id)
   if (idx === -1) throw new Error('Project not found')
   const current = ensureProfileDefaults(profiles[idx])
@@ -418,15 +434,15 @@ export async function updateProjectProfile(
   if (patch.customFields !== undefined) next.customFields = patch.customFields.map(ensureCustomFieldDefaults)
   if (patch.flows !== undefined) next.flows = sortFlows(patch.flows)
   profiles[idx] = ensureProfileDefaults(next)
-  persistLocalProfiles(profiles)
+  await persistLocalProfiles(profiles)
   emitProjectsUpdated()
   return profiles[idx]
 }
 
 export async function deleteProjectProfile(id: string): Promise<ProjectProfile[]> {
-  const profiles = readLocalProfiles()
+  const profiles = await readLocalProfiles()
   const filtered = profiles.filter((p) => p.id !== id)
-  persistLocalProfiles(filtered)
+  await persistLocalProfiles(filtered)
   emitProjectsUpdated()
   return sortProfiles(filtered)
 }
@@ -770,11 +786,17 @@ function ensureTenderRecord(record: ProjectTenderRecord): ProjectTenderRecord {
   }
 }
 
-function readLocalTenderCache(): LocalTenderCacheEntry[] {
+async function getTenderStorageKey(): Promise<string> {
+  const userId = await getUserId()
+  return userId ? `${TENDER_STORAGE_KEY}:${userId}` : TENDER_STORAGE_KEY
+}
+
+async function readLocalTenderCache(): Promise<LocalTenderCacheEntry[]> {
   const storage = getStorage()
   if (!storage) return []
   try {
-    const raw = storage.getItem(TENDER_STORAGE_KEY)
+    const key = await getTenderStorageKey()
+    const raw = storage.getItem(key)
     if (!raw) return []
     const parsed = JSON.parse(raw)
     if (!Array.isArray(parsed)) return []
@@ -805,11 +827,12 @@ function readLocalTenderCache(): LocalTenderCacheEntry[] {
   }
 }
 
-function writeLocalTenderCache(entries: LocalTenderCacheEntry[]) {
+async function writeLocalTenderCache(entries: LocalTenderCacheEntry[]) {
   const storage = getStorage()
   if (!storage) return
   try {
-    storage.setItem(TENDER_STORAGE_KEY, JSON.stringify(entries))
+    const key = await getTenderStorageKey()
+    storage.setItem(key, JSON.stringify(entries))
   } catch {}
 }
 
@@ -865,12 +888,18 @@ export async function listTenderAnalyses(options: {
 } = {}): Promise<TenderAnalysisSummary[]> {
   const { projectId } = options
   const summaries: TenderAnalysisSummary[] = []
+  // Add user filtering for Supabase queries
+  const { data: { session } } = await supabase.auth.getSession()
+  const userId = session?.user?.id
   try {
     let query = supabase
       .from('construction_tenders')
       .select('id, project_id, tender_number, title, status, currency, closing_date, total_amount, line_count, updated_at, payload')
       .order('updated_at', { ascending: false })
       .limit(100)
+    if (userId) {
+      query = query.eq('owner', userId)
+    }
     if (projectId) {
       query = query.eq('project_id', projectId)
     }
@@ -912,7 +941,7 @@ export async function listTenderAnalyses(options: {
     console.warn('listTenderAnalyses: falling back to local cache', error)
   }
 
-  const localEntries = readLocalTenderCache().filter((entry) => !projectId || entry.projectId === projectId)
+  const localEntries = (await readLocalTenderCache()).filter((entry) => !projectId || entry.projectId === projectId)
   localEntries.forEach((entry) => {
     summaries.push({
       id: entry.id,
@@ -938,7 +967,7 @@ export async function getTenderAnalysis(params: {
   storage: 'supabase' | 'local'
 }): Promise<TenderAnalysisDetail | null> {
   if (params.storage === 'local') {
-    const entry = readLocalTenderCache().find((item) => item.id === params.id)
+    const entry = (await readLocalTenderCache()).find((item) => item.id === params.id)
     if (!entry) return null
     return {
       id: entry.id,
@@ -948,11 +977,16 @@ export async function getTenderAnalysis(params: {
     }
   }
   try {
-    const { data, error } = await supabase
+    const { data: { session } } = await supabase.auth.getSession()
+    const userId = session?.user?.id
+    let query = supabase
       .from('construction_tenders')
       .select('id, project_id, payload')
       .eq('id', params.id)
-      .single()
+    if (userId) {
+      query = query.eq('owner', userId)
+    }
+    const { data, error } = await query.single()
     if (error) throw error
     if (!data) return null
     const payload = (data as any).payload as ProjectTenderRecord | null
@@ -1016,7 +1050,7 @@ export async function searchTenderLineSuggestions(
   }
 
   const lowercase = trimmed.toLowerCase()
-  readLocalTenderCache()
+  ;(await readLocalTenderCache())
     .filter((entry) => !options.projectId || entry.projectId === options.projectId)
     .forEach((entry) => {
       entry.tender.lines.forEach((line) => {
@@ -1114,7 +1148,7 @@ export async function saveTenderAnalysis(
     const storage = getStorage()
     if (!storage) throw error
     try {
-      const cache = readLocalTenderCache()
+      const cache = await readLocalTenderCache()
       const cacheId = id ?? generateId()
       const nowIso = now()
       const nextEntry: LocalTenderCacheEntry = {
@@ -1131,7 +1165,7 @@ export async function saveTenderAnalysis(
       } else {
         cache.unshift(nextEntry)
       }
-      writeLocalTenderCache(cache)
+      await writeLocalTenderCache(cache)
       return { id: cacheId, stored: 'local' }
     } catch {
       throw error

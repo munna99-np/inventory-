@@ -2,7 +2,7 @@ import './index.css'
 import { applyTheme } from './lib/settings'
 import { StrictMode, Suspense, lazy } from 'react'
 import { createRoot } from 'react-dom/client'
-import { createBrowserRouter, RouterProvider } from 'react-router-dom'
+import { createBrowserRouter, createHashRouter, RouterProvider } from 'react-router-dom'
 import { Toaster } from 'sonner'
 
 import { AuthProvider } from './lib/auth'
@@ -46,8 +46,24 @@ const InvoicePage = lazy(() => import('./routes/InvoicePage'))
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { ProtectedOutlet } from './lib/auth'
 
-const router = createBrowserRouter([
-  { path: '/signin', element: <SignInPage /> },
+// Detect Electron environment
+const isElectron = typeof window !== 'undefined' && 
+  (window.process?.type === 'renderer' || (window.navigator as any)?.userAgent?.includes('Electron'))
+
+// Use HashRouter for Electron (file:// protocol) or BrowserRouter for web
+const createRouter = isElectron ? createHashRouter : createBrowserRouter
+
+const router = createRouter([
+  { 
+    path: '/', 
+    element: <SignInPage />,
+    errorElement: <div className="min-h-screen flex items-center justify-center">Error loading page</div>,
+  },
+  { 
+    path: '/signin', 
+    element: <SignInPage />,
+    errorElement: <div className="min-h-screen flex items-center justify-center">Error loading sign in</div>,
+  },
   {
     element: <ProtectedOutlet />,
     children: [
@@ -99,6 +115,41 @@ const router = createBrowserRouter([
 
 // Apply persisted theme before rendering
 try { applyTheme() } catch {}
+
+// Handle Electron context
+if (isElectron) {
+  // Ensure proper initialization and fix any localStorage issues
+  console.log('Running in Electron environment')
+  // Fix for Electron file:// protocol issues
+  try {
+    if (!localStorage.getItem('app_locale')) {
+      localStorage.setItem('app_locale', 'en-IN')
+    }
+    if (!localStorage.getItem('app_currency')) {
+      localStorage.setItem('app_currency', 'INR')
+    }
+  } catch (e) {
+    console.warn('Could not initialize localStorage:', e)
+  }
+}
+
+// Initialize offline storage and sync service
+if (typeof window !== 'undefined') {
+  import('./lib/offlineStorage').then(({ offlineStorage }) => {
+    offlineStorage.init().catch((err) => {
+      console.error('Failed to initialize offline storage:', err)
+    })
+  })
+
+  import('./lib/syncService').then(({ syncService }) => {
+    // Try initial sync if online
+    if (syncService.isConnected()) {
+      syncService.sync().catch((err) => {
+        console.error('Initial sync failed:', err)
+      })
+    }
+  })
+}
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

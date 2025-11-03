@@ -39,16 +39,16 @@ export default function StaffPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         {(['staff','salary','advance','reports'] as Tab[]).map((t) => (
-          <Button key={t} variant={tab === t ? 'default' : 'outline'} onClick={() => setTab(t)}>{t[0].toUpperCase() + t.slice(1)}</Button>
+          <Button key={t} variant={tab === t ? 'default' : 'outline'} size="sm" className="h-8 px-3 text-xs" onClick={() => setTab(t)}>{t[0].toUpperCase() + t.slice(1)}</Button>
         ))}
-        <div className="ml-auto flex items-center gap-2">
-          <Button asChild variant="outline">
-            <Link to="/staff/attendance">Mark attendance</Link>
+        <div className="ml-auto flex flex-wrap items-center gap-2">
+          <Button asChild variant="outline" size="sm" className="h-8 px-3 text-xs">
+            <Link to="/staff/attendance">Attendance</Link>
           </Button>
-          <Button asChild variant="outline">
-            <Link to="/staff/attendance-report">Attendance report</Link>
+          <Button asChild variant="outline" size="sm" className="h-8 px-3 text-xs">
+            <Link to="/staff/attendance-report">Report</Link>
           </Button>
           <select className="h-9 border rounded-md px-2" value={selectedStaff} onChange={(e) => setSelectedStaff(e.target.value)}>
             <option value="">All staff</option>

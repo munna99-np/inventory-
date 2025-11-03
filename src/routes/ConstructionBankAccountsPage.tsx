@@ -132,18 +132,18 @@ export default function ConstructionBankAccountsPage() {
             Back
           </Button>
           <div className="mt-1">
-            <h1 className="text-2xl font-semibold text-foreground">Bank accounts</h1>
+            <h1 className="text-lg sm:text-xl font-semibold text-foreground">Bank accounts</h1>
             <p className="text-sm text-muted-foreground">Card view of project accounts and quick statement access.</p>
           </div>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Button variant="outline" size="sm" onClick={() => load(true)} disabled={refreshing} className="gap-2">
-            <RefreshCcw className={cn('h-4 w-4', refreshing ? 'animate-spin' : '')} />
+        <div className="flex flex-wrap items-center gap-2">
+          <Button variant="outline" size="sm" onClick={() => load(true)} disabled={refreshing} className="h-8 gap-1.5 px-3 text-xs">
+            <RefreshCcw className={cn('h-3.5 w-3.5', refreshing ? 'animate-spin' : '')} />
             Refresh
           </Button>
-          <Button size="sm" className="gap-2" onClick={goAddAccount}>
-            <Plus className="h-4 w-4" />
-            Add account
+          <Button size="sm" className="h-8 gap-1.5 px-3 text-xs" onClick={goAddAccount}>
+            <Plus className="h-3.5 w-3.5" />
+            Add Account
           </Button>
         </div>
       </div>

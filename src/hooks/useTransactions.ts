@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
-import { supabase } from '../lib/supabaseClient'
+import { supabase, isSupabaseConfigured } from '../lib/supabaseClient'
+import { offlineStorage } from '../lib/offlineStorage'
+import { syncService } from '../lib/syncService'
 import type { Transaction } from '../types/transactions'
 
 export type TxFilters = {
@@ -48,12 +50,138 @@ function buildQuery(activeFilters: TxFilters) {
   return query
 }
 
+function applyFilters(items: Transaction[], filters: TxFilters): Transaction[] {
+  let filtered = [...items]
+
+  if (filters.accountId) {
+    filtered = filtered.filter((t) => t.account_id === filters.accountId)
+  }
+  if (filters.categoryId) {
+    if (filters.categoryId === 'uncategorized') {
+      filtered = filtered.filter((t) => !t.category_id)
+    } else {
+      filtered = filtered.filter((t) => t.category_id === filters.categoryId)
+    }
+  }
+  if (filters.partyId) {
+    filtered = filtered.filter((t) => t.party_id === filters.partyId)
+  }
+  if (filters.scope) {
+    filtered = filtered.filter((t) => t.scope === filters.scope)
+  }
+  if (filters.direction) {
+    filtered = filtered.filter((t) => t.direction === filters.direction)
+  }
+  if (filters.mode) {
+    filtered = filtered.filter((t) => t.mode === filters.mode)
+  }
+  if (filters.from) {
+    const fromDateStr = String(filters.from)
+    filtered = filtered.filter((t) => {
+      const txDate = typeof t.date === 'string' ? t.date : (t.date instanceof Date ? t.date.toISOString().slice(0, 10) : String(t.date))
+      return txDate >= fromDateStr
+    })
+  }
+  if (filters.to) {
+    const toDateStr = String(filters.to)
+    filtered = filtered.filter((t) => {
+      const txDate = typeof t.date === 'string' ? t.date : (t.date instanceof Date ? t.date.toISOString().slice(0, 10) : String(t.date))
+      return txDate <= toDateStr
+    })
+  }
+  if (filters.search) {
+    const searchLower = filters.search.toLowerCase()
+    filtered = filtered.filter((t) => t.notes?.toLowerCase().includes(searchLower))
+  }
+
+  // Sort by date descending
+  return filtered.sort((a, b) => {
+    const dateA = typeof a.date === 'string' ? a.date : (a.date instanceof Date ? a.date.toISOString() : String(a.date))
+    const dateB = typeof b.date === 'string' ? b.date : (b.date instanceof Date ? b.date.toISOString() : String(b.date))
+    return dateB > dateA ? 1 : -1
+  })
+}
+
 export function useTransactions(filters: TxFilters = {}) {
   const [data, setData] = useState<Transaction[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [isOffline, setIsOffline] = useState(!syncService.isConnected())
 
   const serializedFilters = useMemo(() => JSON.stringify(filters), [filters])
+
+  const refetch = useMemo(() => {
+    return async () => {
+      const activeFilters = JSON.parse(serializedFilters) as TxFilters
+      setLoading(true)
+      setError(null)
+      
+      try {
+        // Try offline first
+        const offlineData = await offlineStorage.get<Transaction>('transactions')
+        const offlineArray = Array.isArray(offlineData) ? offlineData : []
+        
+        if (offlineArray.length > 0) {
+          const filtered = applyFilters(offlineArray.map(normaliseTransaction), activeFilters)
+          setData(filtered)
+        }
+
+        // If online, fetch from server
+        if (syncService.isConnected() && isSupabaseConfigured) {
+          try {
+            const { data: serverData, error: serverError } = await buildQuery(activeFilters)
+            
+            if (serverError) {
+              if (offlineArray.length === 0) {
+                setError(serverError.message)
+                setData([])
+              }
+              return
+            }
+
+            const normalized = ((serverData as any) || []).map(normaliseTransaction)
+            
+            if (normalized.length > 0) {
+              await offlineStorage.save('transactions', normalized)
+            }
+            
+            setData(normalized)
+            setError(null)
+          } catch (err: unknown) {
+            if (offlineArray.length === 0) {
+              const message = err instanceof Error ? err.message : 'Failed to load transactions'
+              setError(message)
+              setData([])
+            }
+          }
+        } else if (offlineArray.length === 0) {
+          setError('Offline - no cached data available')
+        }
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : 'Failed to load transactions'
+        setError(message)
+        setData([])
+      } finally {
+        setLoading(false)
+      }
+    }
+  }, [serializedFilters])
+
+  useEffect(() => {
+    // Listen to online/offline status changes
+    const unsubscribe = syncService.onStatusChange((online) => {
+      setIsOffline(!online)
+      if (online) {
+        // When coming online, sync and refetch
+        syncService.sync().then(() => {
+          refetch()
+        })
+      }
+    })
+    return () => {
+      unsubscribe()
+    }
+  }, [refetch])
 
   useEffect(() => {
     let isMounted = true
@@ -64,16 +192,59 @@ export function useTransactions(filters: TxFilters = {}) {
       setError(null)
 
       try {
-        const { data, error } = await buildQuery(activeFilters)
-        if (!isMounted) return
-
-        if (error) {
-          setError(error.message)
-          setData([])
-          return
+        // First, try to load from offline storage for instant display
+        const offlineData = await offlineStorage.get<Transaction>('transactions')
+        const offlineArray = Array.isArray(offlineData) ? offlineData : []
+        
+        if (offlineArray.length > 0 && isMounted) {
+          const filtered = applyFilters(offlineArray.map(normaliseTransaction), activeFilters)
+          setData(filtered)
+          setLoading(false)
         }
 
-        setData(((data as any) || []).map(normaliseTransaction))
+        // If online and Supabase is configured, fetch from server
+        if (syncService.isConnected() && isSupabaseConfigured) {
+          try {
+            const { data: serverData, error: serverError } = await buildQuery(activeFilters)
+            if (!isMounted) return
+
+            if (serverError) {
+              // If server error but we have offline data, use that
+              if (offlineArray.length === 0) {
+                setError(serverError.message)
+                setData([])
+              }
+              return
+            }
+
+            const normalized = ((serverData as any) || []).map(normaliseTransaction)
+            
+            // Save to offline storage
+            if (normalized.length > 0) {
+              await offlineStorage.save('transactions', normalized)
+            }
+
+            // Update UI
+            if (isMounted) {
+              setData(normalized)
+              setError(null)
+            }
+          } catch (err: unknown) {
+            // Network error - use offline data if available
+            if (offlineArray.length === 0 && isMounted) {
+              const message = err instanceof Error ? err.message : 'Failed to load transactions'
+              setError(message)
+              setData([])
+            }
+          }
+        } else if (offlineArray.length === 0 && isMounted) {
+          // Offline and no cached data
+          if (!isSupabaseConfigured) {
+            setError('Database not configured')
+          } else {
+            setError('Offline - no cached data available')
+          }
+        }
       } catch (err: unknown) {
         if (!isMounted) return
         const message = err instanceof Error ? err.message : 'Failed to load transactions'
@@ -92,26 +263,5 @@ export function useTransactions(filters: TxFilters = {}) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [serializedFilters])
 
-  const refetch = async () => {
-    const activeFilters = JSON.parse(serializedFilters) as TxFilters
-    setLoading(true)
-    setError(null)
-    try {
-      const { data, error } = await buildQuery(activeFilters)
-      if (error) {
-        setError(error.message)
-        setData([])
-      } else {
-        setData(((data as any) || []).map(normaliseTransaction))
-      }
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Failed to load transactions'
-      setError(message)
-      setData([])
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  return { data, loading, error, refetch }
+  return { data, loading, error, refetch, isOffline }
 }

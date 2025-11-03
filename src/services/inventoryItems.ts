@@ -59,9 +59,11 @@ export async function addItem(
 }
 
 export async function updateItem(id: string, updates: ItemUpdate) {
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session?.user?.id) throw new Error('User not authenticated')
   const payload: any = { ...updates }
   if (typeof payload.name === 'string') payload.name = payload.name.trim()
-  const run = async (body: any) => supabase.from('inventory_items').update(body).eq('id', id)
+  const run = async (body: any) => supabase.from('inventory_items').update(body).eq('id', id).eq('owner', session.user.id)
   let { error } = await run(payload)
   if (error && String(error.message || '').toLowerCase().includes('max_stock') && String(error.message || '').toLowerCase().includes('does not exist')) {
     const clone = { ...payload }
@@ -72,18 +74,24 @@ export async function updateItem(id: string, updates: ItemUpdate) {
 }
 
 export async function deleteItem(id: string) {
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session?.user?.id) throw new Error('User not authenticated')
   const { error } = await supabase
     .from('inventory_items')
     .delete()
     .eq('id', id)
+    .eq('owner', session.user.id)
   if (error) throw new Error(error.message)
 }
 
 export async function getItem(id: string) {
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session?.user?.id) throw new Error('User not authenticated')
   const run = (fields: string) => supabase
     .from('inventory_items')
     .select(fields)
     .eq('id', id)
+    .eq('owner', session.user.id)
     .single()
   let { data, error } = await run('id,subcategory_id,name,sku,unit,price,stock,min_stock,max_stock,notes, subcategory:inventory_subcategories(id,name, category:inventory_categories(id,name))')
   if (error && String(error.message || '').toLowerCase().includes('max_stock') && String(error.message || '').toLowerCase().includes('does not exist')) {
@@ -94,7 +102,9 @@ export async function getItem(id: string) {
 }
 
 export async function listItems(subcategoryId?: string) {
-  let q = supabase.from('inventory_items').select('*')
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session?.user?.id) throw new Error('User not authenticated')
+  let q = supabase.from('inventory_items').select('*').eq('owner', session.user.id)
   if (subcategoryId) q = q.eq('subcategory_id', subcategoryId)
   q = q.order('created_at', { ascending: false })
   const { data, error } = await q
@@ -730,22 +740,28 @@ export async function sellItem(itemId: string, quantity: number, price?: number,
 }
 
 export async function adjustStock(itemId: string, quantity: number) {
-  const { data: item, error } = await supabase.from('inventory_items').select('stock').eq('id', itemId).single()
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session?.user?.id) throw new Error('User not authenticated')
+  const { data: item, error } = await supabase.from('inventory_items').select('stock').eq('id', itemId).eq('owner', session.user.id).single()
   if (error) throw new Error(error.message)
   const current = Number(item?.stock || 0)
   const { error: updErr } = await supabase
     .from('inventory_items')
     .update({ stock: current + quantity })
     .eq('id', itemId)
+    .eq('owner', session.user.id)
   if (updErr) throw new Error(updErr.message)
   return { success: true }
 }
 
 // 4. Reports & Tracking
 export async function getStockReport() {
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session?.user?.id) throw new Error('User not authenticated')
   const { data, error } = await supabase
     .from('inventory_items')
     .select('id,name,sku,unit,price,stock,min_stock, subcategory:inventory_subcategories(id,name, category:inventory_categories(id,name))')
+    .eq('owner', session.user.id)
     .order('name')
   if (error) throw new Error(error.message)
   return (data || []).map((it: any) => ({
@@ -850,8 +866,10 @@ export async function getPartyPurchaseHistory(partyId: string, params?: DateRang
 
 // 5. Helper Functions
 export async function searchItems(keyword: string, options: { inStockOnly?: boolean; limit?: number } = {}) {
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session?.user?.id) throw new Error('User not authenticated')
   const q = keyword.trim()
-  let query = supabase.from('inventory_items').select('id,name,sku,price,stock,unit')
+  let query = supabase.from('inventory_items').select('id,name,sku,price,stock,unit').eq('owner', session.user.id)
   if (q) query = query.or(`name.ilike.%${q}%,sku.ilike.%${q}%`)
   if (options.inStockOnly) query = query.gt('stock', 0)
   query = query.order('name')
@@ -863,7 +881,9 @@ export async function searchItems(keyword: string, options: { inStockOnly?: bool
 }
 
 export async function calculateStockValue() {
-  const { data, error } = await supabase.from('inventory_items').select('price,stock')
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session?.user?.id) throw new Error('User not authenticated')
+  const { data, error } = await supabase.from('inventory_items').select('price,stock').eq('owner', session.user.id)
   if (error) throw new Error(error.message)
   const total = (data || []).reduce((sum, it: any) => sum + Number(it.price || 0) * Number(it.stock || 0), 0)
   return total

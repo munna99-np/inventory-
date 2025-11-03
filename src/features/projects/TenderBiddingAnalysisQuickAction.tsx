@@ -31,6 +31,7 @@ import { formatCurrency } from "../../lib/format"
 import { saveTenderAnalysis } from "../../services/projects"
 import type { SaveTenderAnalysisResult } from "../../services/projects"
 import type { ProjectTenderLine, ProjectTenderRecord, ProjectTenderStatus } from "../../types/projects"
+import { TextField } from '@mui/material'
 
 type TenderPricingStrategy = "last" | "avg" | "standard"
 
@@ -1466,11 +1467,25 @@ export function TenderBiddingAnalysisQuickAction({
       </header>
       <div className="mt-4 space-y-4">
         <div className="rounded-2xl border border-dashed border-border/60 bg-muted/30 p-3">
-          <textarea
+          <TextField
+            id="outlined-bulk-text"
+            label=""
             value={bulkText}
-            onChange={(event) => setBulkText(event.target.value)}
+            onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
+              setBulkText(event.target.value)
+            }}
             placeholder="Paste CSV rows here (name, quantity, unit)"
-            className="min-h-[140px] w-full resize-y bg-transparent text-sm outline-none"
+            multiline
+            minRows={6}
+            fullWidth
+            sx={{
+              '& .MuiOutlinedInput-root': {
+                backgroundColor: 'transparent',
+              },
+              '& .MuiOutlinedInput-input': {
+                minHeight: '140px',
+              },
+            }}
           />
         </div>
         <div className="flex flex-wrap items-center gap-3">

@@ -16,6 +16,6 @@
     "noFallthroughCasesInSwitch": true,
     "types": ["vite/client", "vitest/globals"]
   },
-  "include": ["src"]
+  "include": ["src", "electron-main.ts", "preload.ts"]
 }
 

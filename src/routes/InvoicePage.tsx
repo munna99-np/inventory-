@@ -5,6 +5,7 @@ import { useParties } from '../hooks/useParties'
 import { formatCurrency } from '../lib/format'
 import { printHtml } from '../lib/print'
 import { searchItems, getLatestPurchaseRate } from '../services/inventoryItems'
+import { TextField } from '@mui/material'
 
 type Line = {
   itemId?: string
@@ -236,12 +237,17 @@ export default function InvoicePage() {
               </div>
             )}
           </div>
-          <label className="block text-sm font-medium">Address</label>
-          <textarea
-            className="w-full h-24 rounded-md border p-2 text-sm"
-            placeholder="Party address"
+          <TextField
+            id="outlined-address"
+            label="Address"
             value={partyAddress}
-            onChange={(e) => setPartyAddress(e.target.value)}
+            onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
+              setPartyAddress(event.target.value)
+            }}
+            placeholder="Party address"
+            multiline
+            rows={3}
+            fullWidth
           />
         </div>
         <div className="grid grid-cols-2 gap-4 content-start">

@@ -182,12 +182,12 @@ export default function CategoriesPage() {
   }
   return (
     <div className="space-y-6">
-      <header className="flex flex-wrap items-center justify-between gap-3">
+      <header className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-2 text-xl font-semibold">
           <IconCategories size={20} className="text-primary" />
           Category Architect
         </div>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex items-center gap-2">
           <Input
             className="h-9 w-48"
             placeholder="Search categories"

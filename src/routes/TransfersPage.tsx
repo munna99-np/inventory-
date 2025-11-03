@@ -82,7 +82,7 @@ export default function TransfersPage() {
   return (
     <div className="space-y-8">
       <div className="flex flex-col gap-2">
-        <h1 className="text-2xl font-semibold">Transfers</h1>
+        <h1 className="text-lg sm:text-xl font-semibold">Transfers</h1>
         <p className="text-sm text-muted-foreground">Move balances between accounts and review the transfer trail.</p>
       </div>
 
@@ -92,7 +92,7 @@ export default function TransfersPage() {
             <CardTitle className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Transfers</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-semibold">{stats.count}</p>
+            <p className="text-lg sm:text-xl font-semibold">{stats.count}</p>
             <p className="text-xs text-muted-foreground">Total recorded</p>
           </CardContent>
         </Card>
@@ -101,7 +101,7 @@ export default function TransfersPage() {
             <CardTitle className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Total Volume</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-semibold">{formatCurrency(stats.totalVolume)}</p>
+            <p className="text-lg sm:text-xl font-semibold">{formatCurrency(stats.totalVolume)}</p>
             <p className="text-xs text-muted-foreground">Sum of all transfers</p>
           </CardContent>
         </Card>

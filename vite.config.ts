@@ -1,14 +1,64 @@
 import react from '@vitejs/plugin-react'
-import { defineConfig } from 'vite'
+import { defineConfig, loadEnv } from 'vite'
 import polyfillNode from 'rollup-plugin-polyfill-node'
+import electron from 'vite-plugin-electron'
+import renderer from 'vite-plugin-electron-renderer'
 
 // Node core polyfills for browser build
 const nodePolyfills = {
   path: 'path-browserify',
 }
 
-export default defineConfig({
-  plugins: [react()],
+export default defineConfig(({ mode }) => {
+  // Load env file based on `mode` in the current working directory.
+  const env = loadEnv(mode, process.cwd(), '')
+  
+  return {
+  base: './', // Required for Electron file:// protocol
+  plugins: [
+    react(),
+    electron([
+      {
+        // Main-Process entry file of the Electron App.
+        entry: 'electron-main.ts',
+        onstart(options) {
+          // Notify the Renderer-Process to reload the page when the Main-Process builds successfully.
+          options.reload()
+        },
+        vite: {
+          build: {
+            sourcemap: true,
+            minify: process.env.NODE_ENV === 'production',
+            outDir: 'dist-electron',
+            rollupOptions: {
+              external: ['electron'],
+            },
+          },
+        },
+      },
+      {
+        entry: 'preload.ts',
+        onstart(options) {
+          // Notify the Renderer-Process to reload the page when the Preload-Scripts build successfully.
+          options.reload()
+        },
+        vite: {
+          build: {
+            sourcemap: 'inline',
+            minify: process.env.NODE_ENV === 'production',
+            outDir: 'dist-electron',
+            rollupOptions: {
+              external: ['electron'],
+            },
+          },
+        },
+      },
+    ]),
+    // Use Node.js API in the Renderer-process
+    renderer({
+      nodeIntegration: false,
+    }),
+  ],
   resolve: {
     alias: nodePolyfills,
   },
@@ -46,5 +96,26 @@ export default defineConfig({
     // Note: keep warnings in dev for debugging
     minify: 'esbuild',
     target: 'es2019',
+    // Ensure assets are properly referenced in Electron
+    assetsInlineLimit: 0,
+    // Ensure proper asset paths for Electron
+    assetsDir: 'assets',
   },
+  // Define environment variables that should be available in production
+  // These are embedded at build time from .env file or Vercel env vars
+  // Note: Vite automatically exposes VITE_* env vars, but we define them explicitly for reliability
+  define: {
+    // Use process.env for build-time values, fallback to empty string
+    'import.meta.env.VITE_SUPABASE_URL': JSON.stringify(
+      env.VITE_SUPABASE_URL || process.env.VITE_SUPABASE_URL || ''
+    ),
+    'import.meta.env.VITE_SUPABASE_ANON_KEY': JSON.stringify(
+      env.VITE_SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || ''
+    ),
+    // Ensure mode is available
+    'import.meta.env.MODE': JSON.stringify(mode),
+    'import.meta.env.PROD': JSON.stringify(mode === 'production'),
+    'import.meta.env.DEV': JSON.stringify(mode === 'development'),
+  },
+  }
 })

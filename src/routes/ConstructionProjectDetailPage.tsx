@@ -142,17 +142,17 @@ export default function ConstructionProjectDetailPage() {
             Back
           </Button>
           <div className="mt-1">
-            <h1 className="text-2xl font-semibold text-foreground">{project.name}</h1>
+            <h1 className="text-lg sm:text-xl font-semibold text-foreground">{project.name}</h1>
             <p className="text-sm text-muted-foreground">Construction project hub</p>
           </div>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Button variant="outline" size="sm" onClick={openStatement} className="gap-2">
-            <FileText className="h-4 w-4" />
-            Project statement
+        <div className="flex flex-wrap items-center gap-2">
+          <Button variant="outline" size="sm" onClick={openStatement} className="h-8 gap-1.5 px-3 text-xs">
+            <FileText className="h-3.5 w-3.5" />
+            Statement
           </Button>
-          <Button variant="outline" size="sm" onClick={() => load(true)} disabled={refreshing} className="gap-2">
-            <RefreshCcw className={cn("h-4 w-4", refreshing ? "animate-spin" : "")} />
+          <Button variant="outline" size="sm" onClick={() => load(true)} disabled={refreshing} className="h-8 gap-1.5 px-3 text-xs">
+            <RefreshCcw className={cn("h-3.5 w-3.5", refreshing ? "animate-spin" : "")} />
             Refresh
           </Button>
         </div>

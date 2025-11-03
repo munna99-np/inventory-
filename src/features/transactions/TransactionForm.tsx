@@ -6,6 +6,8 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { transactionSchema } from '../../types/transactions'
 import { Input } from '../../components/ui/input'
 import { Button } from '../../components/ui/button'
+import { Label } from '../../components/ui/label'
+import { FormField } from '../../components/ui/form-field'
 import MoneyInput from '../../components/fields/MoneyInput'
 import ScopeSelect from '../../components/fields/ScopeSelect'
 import { useAccounts } from '../../hooks/useAccounts'
@@ -154,107 +156,162 @@ export default function TransactionForm({ onCreated, initialScope }: { onCreated
   }
 
   return (
-    <form className="grid grid-cols-1 md:grid-cols-2 gap-3" onSubmit={form.handleSubmit(onSubmit)}>
-      <div>
-        <label className="text-sm">Date</label>
-        <Input type="date" {...form.register('date')} />
-      </div>
-      <div>
-        <label className="text-sm">Account</label>
-        <select className="h-9 w-full border rounded-md px-2" {...form.register('account_id')}>
-          <option value="">Select account</option>
-          {accounts.map((a) => (
-            <option key={a.id} value={a.id}>{a.name}</option>
-          ))}
-        </select>
-      </div>
-      <div>
-        <label className="text-sm">Direction</label>
-        <select className="h-9 w-full border rounded-md px-2" {...form.register('direction')}>
-          <option value="in">Inflow</option>
-          <option value="out">Outflow</option>
-          <option value="transfer">Transfer</option>
-        </select>
-      </div>
-      <div className="space-y-1">
-        <label className="text-sm">Scope</label>
-        <ScopeSelect
-          value={form.watch('scope') as any}
-          onValueChange={(v) => form.setValue('scope', v)}
-          className="w-full"
-          placeholder="Choose scope"
-        />
-      </div>
-      {direction !== 'transfer' && (
-        <div className="space-y-1">
-          <label className="text-sm">Category</label>
-          <select
-            className="h-9 w-full rounded-md border px-2 transition focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-            value={categoryId ?? ''}
-            onChange={(event) => form.setValue('category_id', event.target.value || null)}
+    <form className="w-full max-w-4xl mx-auto space-y-6" onSubmit={form.handleSubmit(onSubmit)}>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
+        <FormField label="Date" htmlFor="date">
+          <Input 
+            id="date" 
+            type="date" 
+            className="w-full" 
+            {...form.register('date')} 
+          />
+        </FormField>
+
+        <FormField label="Account" htmlFor="account_id" required>
+          <select 
+            id="account_id"
+            className="h-10 w-full rounded-md border border-input bg-background px-4 py-2 text-base shadow-sm transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 sm:h-11" 
+            {...form.register('account_id')}
           >
-            <option value="">Select category</option>
-            {filteredCategories.map((c) => (
-              <option key={c.id} value={c.id}>{c.name}</option>
+            <option value="">Select account</option>
+            {accounts.map((a) => (
+              <option key={a.id} value={a.id}>{a.name}</option>
             ))}
           </select>
-          {!categoryId ? (
-            <p className="text-xs text-amber-600">Please choose a category to classify this transaction.</p>
-          ) : null}
-        </div>
-      )}
-      {direction !== 'transfer' && categoryId && (
-        <div className="md:col-span-2 space-y-1">
-          <label className="text-sm">Sub-category</label>
-          <div className="flex flex-wrap items-center gap-2">
+        </FormField>
+
+        <FormField label="Direction" htmlFor="direction">
+          <select 
+            id="direction"
+            className="h-10 w-full rounded-md border border-input bg-background px-4 py-2 text-base shadow-sm transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 sm:h-11" 
+            {...form.register('direction')}
+          >
+            <option value="in">Inflow</option>
+            <option value="out">Outflow</option>
+            <option value="transfer">Transfer</option>
+          </select>
+        </FormField>
+
+        <FormField label="Scope" htmlFor="scope">
+          <ScopeSelect
+            value={form.watch('scope') as any}
+            onValueChange={(v) => form.setValue('scope', v)}
+            className="w-full"
+            placeholder="Choose scope"
+          />
+        </FormField>
+
+        {direction !== 'transfer' && (
+          <FormField 
+            label="Category" 
+            htmlFor="category_id" 
+            required
+            description={!categoryId ? "Please choose a category to classify this transaction." : undefined}
+            className="sm:col-span-2"
+          >
             <select
-              className="h-9 w-full border rounded-md px-2 md:w-auto"
-              value={subCategoryId ?? ''}
-              onChange={(event) => form.setValue('sub_category_id', event.target.value || null)}
+              id="category_id"
+              className="h-10 w-full rounded-md border border-input bg-background px-4 py-2 text-base shadow-sm transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 sm:h-11"
+              value={categoryId ?? ''}
+              onChange={(event) => form.setValue('category_id', event.target.value || null)}
             >
-              <option value="">No sub-category</option>
-              {childCategories.map((child) => (
-                <option key={child.id} value={child.id}>{child.name}</option>
+              <option value="">Select category</option>
+              {filteredCategories.map((c) => (
+                <option key={c.id} value={c.id}>{c.name}</option>
               ))}
             </select>
-            <Button type="button" variant="outline" size="sm" onClick={handleCreateSubCategory}>
-              Add sub-category
-            </Button>
-          </div>
-          {childCategories.length === 0 ? (
-            <p className="text-xs text-muted-foreground">No sub-categories yet. Use the button to create one instantly.</p>
-          ) : null}
-        </div>
-      )}
-      {showParty && (
-        <div>
-          <label className="text-sm">Party</label>
-          <select className="h-9 w-full border rounded-md px-2" {...form.register('party_id')}>
-            <option value="">Select party</option>
-            {parties.map((p) => (
-              <option key={p.id} value={p.id}>{p.name}</option>
-            ))}
-          </select>
-        </div>
-      )}
-      <div>
-        <label className="text-sm">Mode</label>
-        <Input placeholder="cash, bank_transfer, etc" {...form.register('mode')} />
+          </FormField>
+        )}
+
+        {direction !== 'transfer' && categoryId && (
+          <FormField 
+            label="Sub-category" 
+            htmlFor="sub_category_id"
+            description={childCategories.length === 0 ? "No sub-categories yet. Use the button to create one instantly." : undefined}
+            className="sm:col-span-2"
+          >
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+              <select
+                id="sub_category_id"
+                className="h-10 flex-1 rounded-md border border-input bg-background px-4 py-2 text-base shadow-sm transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 sm:h-11"
+                value={subCategoryId ?? ''}
+                onChange={(event) => form.setValue('sub_category_id', event.target.value || null)}
+              >
+                <option value="">No sub-category</option>
+                {childCategories.map((child) => (
+                  <option key={child.id} value={child.id}>{child.name}</option>
+                ))}
+              </select>
+              <Button 
+                type="button" 
+                variant="outline" 
+                size="default"
+                className="w-full sm:w-auto"
+                onClick={handleCreateSubCategory}
+              >
+                Add sub-category
+              </Button>
+            </div>
+          </FormField>
+        )}
+
+        {showParty && (
+          <FormField label="Party" htmlFor="party_id" required>
+            <select 
+              id="party_id"
+              className="h-10 w-full rounded-md border border-input bg-background px-4 py-2 text-base shadow-sm transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 sm:h-11" 
+              {...form.register('party_id')}
+            >
+              <option value="">Select party</option>
+              {parties.map((p) => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </select>
+          </FormField>
+        )}
+
+        <FormField label="Mode" htmlFor="mode">
+          <Input 
+            id="mode"
+            placeholder="cash, bank_transfer, etc" 
+            className="w-full"
+            {...form.register('mode')} 
+          />
+        </FormField>
+
+        <FormField label="Amount" htmlFor="amount" required>
+          <MoneyInput 
+            value={form.watch('amount') as any} 
+            onChange={(v) => form.setValue('amount', v as any)} 
+          />
+        </FormField>
+
+        <FormField label="Quantity (optional)" htmlFor="qty">
+          <MoneyInput 
+            value={form.watch('qty') as any} 
+            onChange={(v) => form.setValue('qty', v as any)} 
+          />
+        </FormField>
+
+        <FormField label="Notes" htmlFor="notes" className="sm:col-span-2">
+          <Input 
+            id="notes"
+            placeholder="Optional" 
+            className="w-full"
+            {...form.register('notes')} 
+          />
+        </FormField>
       </div>
-      <div>
-        <label className="text-sm">Amount</label>
-        <MoneyInput value={form.watch('amount') as any} onChange={(v) => form.setValue('amount', v as any)} />
-      </div>
-      <div>
-        <label className="text-sm">Quantity (optional)</label>
-        <MoneyInput value={form.watch('qty') as any} onChange={(v) => form.setValue('qty', v as any)} />
-      </div>
-      <div className="md:col-span-2">
-        <label className="text-sm">Notes</label>
-        <Input placeholder="Optional" {...form.register('notes')} />
-      </div>
-      <div className="md:col-span-2 flex justify-end">
-        <Button type="submit" disabled={submitting}>{submitting ? 'Saving...' : 'Add Transaction'}</Button>
+
+      <div className="flex flex-col sm:flex-row justify-end gap-3 pt-2">
+        <Button 
+          type="submit" 
+          size="lg"
+          className="w-full sm:w-auto sm:min-w-[140px]"
+          disabled={submitting}
+        >
+          {submitting ? 'Saving...' : 'Add Transaction'}
+        </Button>
       </div>
     </form>
   )

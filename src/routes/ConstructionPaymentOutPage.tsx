@@ -14,6 +14,7 @@ import { cn } from '../lib/utils'
 import { getProjectProfile, recordProjectFlow } from '../services/projects'
 import type { ProjectProfile } from '../types/projects'
 import type { Category } from '../types/categories'
+import { TextField } from '@mui/material'
 
 type FormState = {
   accountId: string
@@ -278,12 +279,17 @@ export default function ConstructionPaymentOutPage() {
               </div>
             </FormField>
             <FormField label="Notes">
-              <textarea
+              <TextField
+                id="outlined-notes"
+                label=""
                 value={form.notes}
-                onChange={(event) => setForm((prev) => ({ ...prev, notes: event.target.value }))}
-                rows={3}
-                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
+                  setForm((prev) => ({ ...prev, notes: event.target.value }))
+                }}
                 placeholder="Optional reference"
+                multiline
+                rows={3}
+                fullWidth
               />
             </FormField>
             <div className="flex justify-end gap-2">

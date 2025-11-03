@@ -20,6 +20,7 @@ import { Input } from '../components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select'
 import { cn } from '../lib/utils'
 import { formatCurrency } from '../lib/format'
+import { TextField } from '@mui/material'
 import { ConstructionWorkspaceTabs } from '../features/projects/ConstructionWorkspaceTabs'
 import {
   getTenderAnalysis,
@@ -584,24 +585,25 @@ export default function ConstructionPriceAnalysisPage() {
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-semibold text-foreground">Tender bidding analysis</h1>
+          <h1 className="text-lg sm:text-xl font-semibold text-foreground">Tender bidding analysis</h1>
           <p className="text-sm text-muted-foreground">
             Prepare tender line items with historical pricing, then push the snapshot to the project report.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Button variant="outline" onClick={handleResetTender} className="gap-2">
-            <RefreshCcw className="h-4 w-4" />
-            New tender
+          <Button variant="outline" size="sm" onClick={handleResetTender} className="h-8 gap-1.5 px-3 text-xs">
+            <RefreshCcw className="h-3.5 w-3.5" />
+            New Tender
           </Button>
           <Button
             variant="secondary"
-            className="gap-2"
+            size="sm"
+            className="h-8 gap-1.5 px-3 text-xs"
             onClick={() => navigate(`/construction/${detailsForm.projectId || ''}/report`)}
             disabled={!detailsForm.projectId}
           >
-            Go to report
-            <ArrowUpRight className="h-4 w-4" />
+            Go to Report
+            <ArrowUpRight className="h-3.5 w-3.5" />
           </Button>
         </div>
       </div>
@@ -819,14 +821,17 @@ export default function ConstructionPriceAnalysisPage() {
                   />
                 </div>
                 <div className="md:col-span-3 space-y-2">
-                  <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    Notes
-                  </label>
-                  <textarea
+                  <TextField
+                    id="outlined-notes"
+                    label="Notes"
                     value={lineForm.notes}
-                    onChange={(event) => setLineForm((prev) => ({ ...prev, notes: event.target.value }))}
+                    onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
+                      setLineForm((prev) => ({ ...prev, notes: event.target.value }))
+                    }}
                     placeholder="Add remarks, spec references, or evaluation notes"
-                    className="h-24 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
+                    multiline
+                    rows={4}
+                    fullWidth
                   />
                 </div>
               </div>
@@ -891,7 +896,7 @@ export default function ConstructionPriceAnalysisPage() {
                     Cancel edit
                   </Button>
                 ) : null}
-                <Button onClick={handleAddOrUpdateLine} className="gap-2">
+                <Button onClick={handleAddOrUpdateLine} className="gap-2 rounded-lg">
                   {editingLineId ? (
                     <>
                       <Pencil className="h-4 w-4" />
@@ -1006,23 +1011,24 @@ export default function ConstructionPriceAnalysisPage() {
                 </div>
               </div>
 
-              <div className="flex flex-wrap items-center justify-end gap-2">
-                <Button variant="outline" onClick={handleExport} disabled={!canExport} className="gap-2">
-                  <FileSpreadsheet className="h-4 w-4" />
+              <div className="flex flex-wrap items-center gap-2">
+                <Button variant="outline" size="sm" onClick={handleExport} disabled={!canExport} className="h-8 gap-1.5 px-3 text-xs">
+                  <FileSpreadsheet className="h-3.5 w-3.5" />
                   Export CSV
                 </Button>
                 <Button
                   variant="outline"
+                  size="sm"
                   onClick={() => handlePersist('draft')}
                   disabled={!canSave}
-                  className="gap-2"
+                  className="h-8 gap-1.5 px-3 text-xs"
                 >
-                  {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                  Save draft
+                  {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+                  Save Draft
                 </Button>
-                <Button onClick={() => handlePersist('submitted')} disabled={!canSave} className="gap-2">
-                  {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
-                  Send to report
+                <Button size="sm" onClick={() => handlePersist('submitted')} disabled={!canSave} className="h-8 gap-1.5 px-3 text-xs">
+                  {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
+                  Send to Report
                 </Button>
               </div>
             </CardContent>

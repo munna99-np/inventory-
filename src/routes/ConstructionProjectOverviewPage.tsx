@@ -10,6 +10,7 @@ import MoneyInput from '../components/fields/MoneyInput'
 import { cn } from '../lib/utils'
 import { getProjectProfile, updateProjectProfile } from '../services/projects'
 import type { ProjectProfile } from '../types/projects'
+import { TextField } from '@mui/material'
 
 type FormState = {
   name: string
@@ -196,12 +197,17 @@ export default function ConstructionProjectOverviewPage() {
               <Input type="date" value={form.dueDate} onChange={(event) => handleChange({ dueDate: event.target.value })} />
             </Field>
             <Field label="Description" full>
-              <textarea
+              <TextField
+                id="outlined-description"
+                label=""
                 value={form.description}
-                onChange={(event) => handleChange({ description: event.target.value })}
-                rows={4}
-                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
+                  handleChange({ description: event.target.value })
+                }}
                 placeholder="Summary, milestones, or internal notes"
+                multiline
+                rows={4}
+                fullWidth
               />
             </Field>
             <div className="md:col-span-2 flex justify-end gap-2">

@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { useParties } from '../hooks/useParties'
 import { Input } from '../components/ui/input'
 import { Button } from '../components/ui/button'
+import { SearchBar } from '../components/ui/search-bar'
 import { supabase } from '../lib/supabaseClient'
 import { toast } from 'sonner'
 import { Dialog, DialogContent, DialogTitle, DialogTrigger } from '../components/ui/dialog'
@@ -14,6 +15,7 @@ import { formatCurrency } from '../lib/format'
 import { printHtml } from '../lib/print'
 import { escapeHtml } from '../lib/utils'
 import { IconTransactions } from '../components/icons'
+import { FileDown } from 'lucide-react'
 
 type EditState = { id: string; name: string; phone: string | null; notes: string | null } | null
 
@@ -33,15 +35,25 @@ export default function PartiesPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <h1 className="text-xl font-semibold">Parties</h1>
-        <Input className="h-9 w-60" placeholder="Search…" value={search} onChange={(e) => setSearch(e.target.value)} />
-      </div>
-      <div className="flex items-center justify-end">
-          <Button
-            variant="outline"
-            onClick={async () => {
-            const [partiesRes, txRes, accRes, catRes] = await Promise.all([
+      <div className="flex flex-col gap-3">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <div>
+            <h1 className="text-lg sm:text-xl font-semibold">Parties</h1>
+            <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">Manage your contacts and business parties</p>
+          </div>
+        </div>
+        <SearchBar
+          value={search}
+          onChange={setSearch}
+          placeholder="Search parties…"
+          size="default"
+          actions={[
+            {
+              label: 'Export Report',
+              iconLeft: FileDown,
+              variant: 'outline',
+              onClick: async () => {
+              const [partiesRes, txRes, accRes, catRes] = await Promise.all([
               supabase.from('parties').select('id,name,phone,notes').order('name'),
               supabase
                 .from('transactions')
@@ -50,41 +62,41 @@ export default function PartiesPage() {
                 .order('date', { ascending: true }),
               supabase.from('accounts').select('id,name'),
               supabase.from('categories').select('id,name'),
-            ])
-            if (partiesRes.error) return toast.error(partiesRes.error.message)
-            if (txRes.error) return toast.error(txRes.error.message)
-            if (accRes.error) return toast.error(accRes.error.message)
-            if (catRes.error) return toast.error(catRes.error.message)
+              ])
+              if (partiesRes.error) return toast.error(partiesRes.error.message)
+              if (txRes.error) return toast.error(txRes.error.message)
+              if (accRes.error) return toast.error(accRes.error.message)
+              if (catRes.error) return toast.error(catRes.error.message)
 
               const parties = (partiesRes.data as any[]) || []
               const txns = (txRes.data as any[]) || []
-            const accounts = new Map<string, string>(((accRes.data as any[]) || []).map((a) => [a.id, a.name]))
-            const categories = new Map<string, string>(((catRes.data as any[]) || []).map((c) => [c.id, c.name]))
+              const accounts = new Map<string, string>(((accRes.data as any[]) || []).map((a) => [a.id, a.name]))
+              const categories = new Map<string, string>(((catRes.data as any[]) || []).map((c) => [c.id, c.name]))
 
-            const byParty = new Map<string, any[]>()
-            for (const t of txns) {
-              const pid = t.party_id as string
-              if (!byParty.has(pid)) byParty.set(pid, [])
-              byParty.get(pid)!.push(t)
-            }
+              const byParty = new Map<string, any[]>()
+              for (const t of txns) {
+                const pid = t.party_id as string
+                if (!byParty.has(pid)) byParty.set(pid, [])
+                byParty.get(pid)!.push(t)
+              }
 
-            const sections: string[] = []
-            const sortedParties = parties.slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''))
-            for (const p of sortedParties) {
-              const rows = byParty.get(p.id) || []
-              if (rows.length === 0) continue
-              let totalIn = 0
-              let totalOut = 0
-              const body = rows
-                .map((t) => {
-                  const isIn = t.direction === 'in'
-                  const amt = isIn ? t.amount : Math.abs(t.amount)
-                  if (isIn) totalIn += amt
-                  else totalOut += amt
-                  const acct = accounts.get(t.account_id) || ''
-                  const cat = t.category_id ? categories.get(t.category_id) || '' : ''
-                  const dateStr = (t.date instanceof Date ? t.date.toISOString().slice(0, 10) : String(t.date))
-                  const type = isIn ? 'Received' : 'Given'
+              const sections: string[] = []
+              const sortedParties = parties.slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+              for (const p of sortedParties) {
+                const rows = byParty.get(p.id) || []
+                if (rows.length === 0) continue
+                let totalIn = 0
+                let totalOut = 0
+                const body = rows
+                  .map((t) => {
+                    const isIn = t.direction === 'in'
+                    const amt = isIn ? t.amount : Math.abs(t.amount)
+                    if (isIn) totalIn += amt
+                    else totalOut += amt
+                    const acct = accounts.get(t.account_id) || ''
+                    const cat = t.category_id ? categories.get(t.category_id) || '' : ''
+                    const dateStr = (t.date instanceof Date ? t.date.toISOString().slice(0, 10) : String(t.date))
+                    const type = isIn ? 'Received' : 'Given'
                     return `<tr>
                     <td>${escapeHtml(dateStr)}</td>
                     <td>${escapeHtml(type)}</td>
@@ -125,41 +137,43 @@ export default function PartiesPage() {
                   </div>
                 </div>
               `
-              sections.push(section)
-            }
-            const title = 'Party Payment History'
-            const html = `
+                sections.push(section)
+              }
+              const title = 'Party Payment History'
+              const html = `
               <div class="header">
                 <div class="brand"><div class="badge">Report</div><h1>Parties</h1></div>
                 <div class="muted">${new Date().toLocaleString()}</div>
               </div>
               ${sections.join('')}
             `
-            printHtml(title, html, { primary: '#2563EB', accent: '#10B981' })
-          }}
-        >
-          Download Payment History
-        </Button>
+              printHtml(title, html, { primary: '#2563EB', accent: '#10B981' })
+              },
+            },
+          ]}
+        />
       </div>
       {error && <div className="text-sm text-red-600 mb-2">{error}</div>}
 
       <div className="border rounded-md p-3 space-y-2">
         <div className="font-medium">Add Party</div>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-2 items-end">
-          <div>
+        <div className="flex flex-col sm:flex-row gap-2 items-end">
+          <div className="flex-1 min-w-0">
             <label className="text-sm">Name</label>
-            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Sita Traders" />
+            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Sita Traders" className="w-full" />
           </div>
-          <div>
+          <div className="flex-1 min-w-0 sm:max-w-32">
             <label className="text-sm">Phone</label>
-            <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="9800…" />
+            <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="9800…" className="w-full" />
           </div>
-          <div className="md:col-span-2">
+          <div className="flex-1 min-w-0 sm:max-w-40">
             <label className="text-sm">Notes</label>
-            <Input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Optional" />
+            <Input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Optional" className="w-full" />
           </div>
-          <div className="md:col-span-4 flex justify-end">
+          <div className="flex-shrink-0">
             <Button
+              size="sm"
+              className="rounded-lg"
               onClick={async () => {
                 const n = name.trim()
                 if (!n) return toast.error('Name is required')
@@ -175,7 +189,7 @@ export default function PartiesPage() {
                 await refetch()
               }}
             >
-              Add
+              Add Party
             </Button>
           </div>
         </div>
@@ -217,53 +231,57 @@ export default function PartiesPage() {
                       p.notes ?? '-'
                     )}
                   </td>
-                  <td className="p-2 text-right space-x-2">
-                    {isEditing ? (
-                      <>
-                        <Button
-                          size="sm"
-                          onClick={async () => {
-                            const payload: any = {
-                              name: (editing?.name ?? '').trim(),
-                              phone: (editing?.phone ?? '') || null,
-                              notes: (editing?.notes ?? '') || null,
-                            }
-                            if (!payload.name) return toast.error('Name is required')
-                            const { error } = await supabase.from('parties').update(payload).eq('id', p.id)
-                            if (error) return toast.error(error.message)
-                            toast.success('Party updated')
-                            setEditing(null)
-                            await refetch()
-                          }}
-                        >
-                          Save
-                        </Button>
-                        <Button variant="outline" size="sm" onClick={() => setEditing(null)}>Cancel</Button>
-                      </>
-                    ) : (
-                      <>
-                        <Button size="sm" variant="outline" onClick={() => setEditing({ id: p.id, name: p.name, phone: p.phone ?? '', notes: p.notes ?? '' })}>Edit</Button>
-                        <Button
-                          size="sm"
-                          variant="destructive"
-                          onClick={async () => {
-                            const { error } = await supabase.from('parties').delete().eq('id', p.id)
-                            if (error) {
-                              if (/foreign key|violates/.test(error.message)) {
-                                toast.error('Cannot delete: party is used by transactions')
-                              } else {
-                                toast.error(error.message)
+                  <td className="p-2">
+                    <div className="flex items-center justify-end gap-2 flex-wrap">
+                      {isEditing ? (
+                        <>
+                          <Button
+                            size="sm"
+                            className="rounded-lg"
+                            onClick={async () => {
+                              const payload: any = {
+                                name: (editing?.name ?? '').trim(),
+                                phone: (editing?.phone ?? '') || null,
+                                notes: (editing?.notes ?? '') || null,
                               }
-                              return
-                            }
-                            toast.success('Party deleted')
-                            await refetch()
-                          }}
-                        >
-                          Delete
-                        </Button>
-                      </>
-                    )}
+                              if (!payload.name) return toast.error('Name is required')
+                              const { error } = await supabase.from('parties').update(payload).eq('id', p.id)
+                              if (error) return toast.error(error.message)
+                              toast.success('Party updated')
+                              setEditing(null)
+                              await refetch()
+                            }}
+                          >
+                            Save
+                          </Button>
+                          <Button variant="outline" size="sm" className="rounded-lg" onClick={() => setEditing(null)}>Cancel</Button>
+                        </>
+                      ) : (
+                        <>
+                          <Button size="sm" variant="outline" className="rounded-lg" onClick={() => setEditing({ id: p.id, name: p.name, phone: p.phone ?? '', notes: p.notes ?? '' })}>Edit</Button>
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            className="rounded-lg"
+                            onClick={async () => {
+                              const { error } = await supabase.from('parties').delete().eq('id', p.id)
+                              if (error) {
+                                if (/foreign key|violates/.test(error.message)) {
+                                  toast.error('Cannot delete: party is used by transactions')
+                                } else {
+                                  toast.error(error.message)
+                                }
+                                return
+                              }
+                              toast.success('Party deleted')
+                              await refetch()
+                            }}
+                          >
+                            Delete
+                          </Button>
+                        </>
+                      )}
+                    </div>
                   </td>
                 </tr>
               )
@@ -345,9 +363,9 @@ function PartyActionDialog({ partyId, partyName, onCreated }: { partyId: string;
           <span className="inline-flex h-8 w-8 items-center justify-center rounded-md bg-primary/10 text-primary"><IconTransactions size={16} /></span>
           {partyName}
         </DialogTitle>
-        <div className="mb-3 flex items-center gap-2">
-          <Button size="sm" variant={tab === 'add' ? 'default' : 'outline'} onClick={() => setTab('add')}>Add Entry</Button>
-          <Button size="sm" variant={tab === 'activity' ? 'default' : 'outline'} onClick={() => setTab('activity')}>Activity</Button>
+        <div className="mb-3 flex items-center gap-2 flex-wrap">
+          <Button size="sm" variant={tab === 'add' ? 'default' : 'outline'} className="rounded-lg" onClick={() => setTab('add')}>Add Entry</Button>
+          <Button size="sm" variant={tab === 'activity' ? 'default' : 'outline'} className="rounded-lg" onClick={() => setTab('activity')}>Activity</Button>
         </div>
         {tab === 'add' ? (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-2 items-end">
@@ -410,9 +428,9 @@ function PartyActionDialog({ partyId, partyName, onCreated }: { partyId: string;
             {txError && <div className="text-sm text-red-600 mb-2">{txError}</div>}
             <div className="flex items-center justify-between gap-2 mb-3">
               <div className="inline-flex gap-2">
-                <Button size="sm" variant={activityScope === 'personal' ? 'default' : 'outline'} onClick={() => setActivityScope('personal')}>Personal</Button>
-                <Button size="sm" variant={activityScope === 'work' ? 'default' : 'outline'} onClick={() => setActivityScope('work')}>Work</Button>
-                <Button size="sm" variant={activityScope === '' ? 'default' : 'outline'} onClick={() => setActivityScope('')}>All</Button>
+                <Button size="sm" variant={activityScope === 'personal' ? 'default' : 'outline'} className="rounded-lg" onClick={() => setActivityScope('personal')}>Personal</Button>
+                <Button size="sm" variant={activityScope === 'work' ? 'default' : 'outline'} className="rounded-lg" onClick={() => setActivityScope('work')}>Work</Button>
+                <Button size="sm" variant={activityScope === '' ? 'default' : 'outline'} className="rounded-lg" onClick={() => setActivityScope('')}>All</Button>
               </div>
               <div className="grid grid-cols-3 gap-2">
               {(() => {

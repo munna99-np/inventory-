@@ -181,7 +181,7 @@ export default function AccountsPage() {
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div className="max-w-xl space-y-2">
                 <p className="text-xs font-semibold uppercase tracking-[0.2em] text-white/65">Account activity</p>
-                <h1 className="text-3xl font-semibold md:text-4xl">Account hub</h1>
+                <h1 className="text-xl sm:text-2xl md:text-3xl font-semibold">Account hub</h1>
                 <p className="text-sm text-white/70">
                   Focus on the flow of funds. Each card highlights the account name, current balance, and the latest movements only.
                 </p>
@@ -190,10 +190,10 @@ export default function AccountsPage() {
                 size="sm"
                 variant="outline"
                 onClick={refreshAll}
-                className="bg-white/10 text-white hover:bg-white/20 hover:text-white"
+                className="h-8 bg-white/10 text-white hover:bg-white/20 hover:text-white border-white/20"
                 disabled={loading}
               >
-                <RefreshCcw className="mr-2 h-4 w-4" />
+                <RefreshCcw className="h-3.5 w-3.5 mr-1.5" />
                 Refresh
               </Button>
             </div>
@@ -271,10 +271,10 @@ function AccountCard({ snapshot }: { snapshot: AccountSnapshot }) {
         <p className="text-xs uppercase tracking-wide text-muted-foreground">
           {snapshot.account.kind === 'personal' ? 'Personal account' : 'Company account'}
         </p>
-        <CardTitle className="text-2xl font-semibold text-slate-900">{snapshot.account.name}</CardTitle>
+        <CardTitle className="text-lg sm:text-xl font-semibold text-slate-900">{snapshot.account.name}</CardTitle>
         <div className="space-y-1">
           <p className="text-sm text-muted-foreground">Current balance</p>
-          <p className={clsx('text-3xl font-semibold', balanceTone)}>{formatCurrency(snapshot.balance)}</p>
+          <p className={clsx('text-xl sm:text-2xl font-semibold', balanceTone)}>{formatCurrency(snapshot.balance)}</p>
         </div>
       </CardHeader>
       <CardContent className="space-y-4">

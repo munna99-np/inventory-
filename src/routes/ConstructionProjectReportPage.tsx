@@ -740,7 +740,7 @@ export default function ConstructionProjectReportPage() {
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div className="space-y-2 max-w-2xl">
               <p className="text-[11px] uppercase tracking-[0.4em] text-white/70">Project analytics</p>
-              <h2 className="text-3xl font-semibold text-white">{project.name}</h2>
+              <h2 className="text-xl sm:text-2xl md:text-3xl font-semibold text-white">{project.name}</h2>
               <p className="text-sm text-white/80">
                 A real-time snapshot of inflows, outflows, and transfers with quick access to deeper drilldowns.
               </p>
@@ -757,9 +757,9 @@ export default function ConstructionProjectReportPage() {
                 variant="secondary"
                 size="sm"
                 onClick={() => colorInputRef.current?.click()}
-                className="gap-2 rounded-xl border border-white/20 bg-white/20 text-white hover:bg-white/30"
+                className="h-8 gap-1.5 px-3 text-xs rounded-lg border border-white/20 bg-white/20 text-white hover:bg-white/30"
               >
-                <Palette className="h-4 w-4" />
+                <Palette className="h-3.5 w-3.5" />
                 Theme
               </Button>
               <Button
@@ -767,10 +767,10 @@ export default function ConstructionProjectReportPage() {
                 size="sm"
                 onClick={exportReport}
                 disabled={exporting}
-                className="gap-2 rounded-xl border border-white/20 bg-white/20 text-white hover:bg-white/30 disabled:opacity-70"
+                className="h-8 gap-1.5 px-3 text-xs rounded-lg border border-white/20 bg-white/20 text-white hover:bg-white/30 disabled:opacity-70"
               >
-                <FileDown className={cn('h-4 w-4', exporting ? 'animate-pulse' : '')} />
-                {exporting ? 'Preparing...' : 'Export PDF'}
+                <FileDown className={cn('h-3.5 w-3.5', exporting ? 'animate-pulse' : '')} />
+                {exporting ? 'Exporting...' : 'Export PDF'}
               </Button>
             </div>
           </div>

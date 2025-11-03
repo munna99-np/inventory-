@@ -7,6 +7,7 @@ import { toast } from 'sonner'
 import { addItem, updateItem } from '../../services/inventoryItems'
 import { Dialog, DialogContent, DialogTitle } from '../../components/ui/dialog'
 import { useInvCategories, useInvSubcategories } from '../../hooks/useInventory'
+import { useAuth } from '../../lib/auth'
 
 type Row = {
   id: string
@@ -22,6 +23,7 @@ type Row = {
 }
 
 export default function StockTable() {
+  const { user } = useAuth()
   const [rows, setRows] = useState<Row[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -50,12 +52,14 @@ export default function StockTable() {
   }, [])
 
   useEffect(() => {
+    if (!user?.id) return
     let active = true
     ;(async () => {
       setLoading(true)
       const run = (fields: string) => supabase
         .from('inventory_items')
         .select(fields)
+        .eq('owner', user.id)
         .order('created_at', { ascending: false })
       let { data, error } = await run('id,name,sku,unit,price,stock,min_stock,max_stock,notes, subcategory:inventory_subcategories(id,name, category:inventory_categories(id,name))')
       if (error && String(error.message || '').toLowerCase().includes('max_stock') && String(error.message || '').includes('does not exist')) {
@@ -86,7 +90,7 @@ export default function StockTable() {
       setLoading(false)
     })()
     return () => { active = false }
-  }, [])
+  }, [user?.id])
 
   const startEdit = (id: string) => {
     const r = rows.find((x) => x.id === id)

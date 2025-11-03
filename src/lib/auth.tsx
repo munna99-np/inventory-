@@ -20,7 +20,9 @@ export function AuthProvider({ children }: PropsWithChildren) {
   useEffect(() => {
     if (!isSupabaseConfigured) {
       setLoading(false)
-      if (!configErrorNotified) {
+      setSession(null)
+      // Only show error in dev mode, in production show config message silently
+      if (!configErrorNotified && import.meta.env.DEV) {
         toast.error(missingSupabaseEnvMessage)
         setConfigErrorNotified(true)
       }
@@ -29,21 +31,50 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
     let mounted = true
 
-    supabase.auth.getSession().then(({ data }) => {
-      if (!mounted) return
-      setSession(data.session)
-      setLoading(false)
-    })
+    // Safely get session with error handling
+    supabase.auth.getSession()
+      .then(({ data, error }) => {
+        if (!mounted) return
+        if (error) {
+          // eslint-disable-next-line no-console
+          if (import.meta.env.DEV) console.error('Auth session error:', error)
+          setSession(null)
+        } else {
+          setSession(data.session)
+        }
+        setLoading(false)
+      })
+      .catch((error) => {
+        if (!mounted) return
+        // eslint-disable-next-line no-console
+        if (import.meta.env.DEV) console.error('Auth session catch:', error)
+        setSession(null)
+        setLoading(false)
+      })
 
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, sess) => {
-      if (!mounted) return
-      setSession(sess)
-      setLoading(false)
-    })
+    // Safely subscribe to auth changes
+    let subscription: { unsubscribe: () => void } | null = null
+    try {
+      const { data: sub } = supabase.auth.onAuthStateChange((_event, sess) => {
+        if (!mounted) return
+        setSession(sess)
+        setLoading(false)
+      })
+      subscription = sub.subscription
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      if (import.meta.env.DEV) console.error('Auth state change subscription error:', error)
+    }
 
     return () => {
       mounted = false
-      sub.subscription.unsubscribe()
+      if (subscription) {
+        try {
+          subscription.unsubscribe()
+        } catch (error) {
+          // Ignore unsubscribe errors
+        }
+      }
     }
   }, [configErrorNotified])
 

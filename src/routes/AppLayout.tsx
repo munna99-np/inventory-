@@ -27,6 +27,8 @@ export default function AppLayout() {
   // Re-render when settings change (currency/locale/theme)
   const [, setSettingsVersion] = useState(0)
   const [globalSearch, setGlobalSearch] = useState('')
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  
   useEffect(() => {
     const handler = () => setSettingsVersion((v) => v + 1)
     window.addEventListener('app:settings', handler as any)
@@ -36,7 +38,7 @@ export default function AppLayout() {
   return (
     <div className="min-h-screen bg-[radial-gradient(1200px_600px_at_10%_-10%,hsl(var(--primary)/.08),transparent),_radial-gradient(900px_500px_at_90%_-20%,hsl(var(--secondary)/.08),transparent)] p-2 sm:p-4">
       <div className="mx-auto max-w-[1400px] rounded-2xl border bg-background/90 backdrop-blur supports-[backdrop-filter]:bg-background/80 shadow-sm grid grid-cols-[240px_1fr] min-h-[calc(100vh-16px)]">
-      {/* Sidebar (sticky, no inner scrollbars) */}
+        {/* Sidebar (sticky, no inner scrollbars) */}
       <aside className="hidden md:flex flex-col border-r bg-background/60 backdrop-blur-sm sticky top-0 z-30 h-screen">
         <div className="h-14 border-b px-4 flex items-center gap-2">
           <Link to="/" className="flex items-center gap-2 font-semibold">
@@ -66,13 +68,58 @@ export default function AppLayout() {
           </nav>
         )}
         <div className="mt-auto p-3 text-xs text-muted-foreground">Ac {new Date().getFullYear()}</div>
-      </aside>
+        </aside>
 
-      {/* Content */}
-      {/* Content column (window scroll only) */}
-      <div className="flex min-h-full flex-col">
-        {/* Topbar */}
-        <header className="h-14 border-b bg-background/60 backdrop-blur-sm flex items-center justify-between px-4 sticky top-0 z-40 shadow-sm">
+        {/* Mobile Menu (overlay) */}
+        {mobileMenuOpen && (
+          <div className="fixed inset-0 z-50 md:hidden" onClick={() => setMobileMenuOpen(false)}>
+            <div className="fixed inset-y-0 left-0 w-64 bg-background border-r shadow-lg" onClick={(e) => e.stopPropagation()}>
+              <div className="h-14 border-b px-4 flex items-center justify-between">
+                <Link to="/" className="flex items-center gap-2 font-semibold" onClick={() => setMobileMenuOpen(false)}>
+                  <span className="inline-flex h-8 w-8 items-center justify-center rounded-md bg-primary/10 text-primary">
+                    <AppIcon name="brand" size={18} fallback={<IconBrand size={18} />} />
+                  </span>
+                  <span>FlowTrack</span>
+                </Link>
+                <button onClick={() => setMobileMenuOpen(false)} className="p-2">×</button>
+              </div>
+              {user && (
+                <nav className="p-3 space-y-1">
+                  <NavItem to="/dashboard" label="Dashboard" icon={IconDashboard} iconName="dashboard" />
+                  <NavItem to="/transactions" label="Transactions" icon={IconTransactions} iconName="transactions" />
+                  <NavItem to="/transfers" label="Transfers" icon={IconTransfers} iconName="transfers" />
+                  <NavItem to="/inventory" label="Inventory" icon={IconCategories} iconName="categories" />
+                  <NavItem to="/accounts" label="Accounts" icon={IconAccounts} iconName="accounts" />
+                  <NavItem to="/categories" label="Categories" icon={IconCategories} iconName="categories" />
+                  <NavItem to="/construction" label="Construction Work" icon={IconCategories} iconName="categories" />
+                  <NavItem to="/construction/price-analysis" label="Price Analysis" icon={IconReports} iconName="reports" />
+                  <NavItem to="/parties" label="Parties" icon={IconParties} iconName="parties" />
+                  <NavItem to="/reports" label="Reports" icon={IconReports} iconName="reports" />
+                  <NavItem to="/reports/vat" label="VAT Auditor Report" icon={IconReports} iconName="reports" />
+                  <NavItem to="/staff" label="Staff" icon={IconAccounts} iconName="staff" />
+                  <NavItem to="/staff/attendance" label="Attendance" icon={IconReports} iconName="attendance" />
+                  <NavItem to="/staff/attendance-report" label="Attendance report" icon={IconReports} iconName="reports" />
+                  <NavItem to="/invoice" label="Invoice" icon={IconAccounts} iconName="invoice" />
+                </nav>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Content */}
+        {/* Content column (window scroll only) */}
+        <div className="flex min-h-full flex-col">
+          {/* Topbar */}
+          <header className="h-14 border-b bg-background/60 backdrop-blur-sm flex items-center justify-between px-4 sticky top-0 z-40 shadow-sm">
+            <button
+              onClick={() => setMobileMenuOpen(true)}
+              className="md:hidden p-2 rounded-md hover:bg-muted"
+              aria-label="Open menu"
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            </button>
           <div className="flex items-center gap-2 w-full max-w-xl">
             <div className="flex w-full items-center gap-2">
               <input

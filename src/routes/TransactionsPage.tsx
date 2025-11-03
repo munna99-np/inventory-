@@ -215,25 +215,25 @@ export default function TransactionsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="rounded-3xl border bg-white/80 p-6 shadow-sm">
+      <div className="rounded-xl border bg-card/80 p-4 sm:p-6 shadow-sm">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="space-y-1">
-            <h1 className="text-2xl font-semibold">Transactions</h1>
-            <p className="text-sm text-muted-foreground">Monitor every payment, transfer, and withdrawal in one place.</p>
+            <h1 className="text-lg sm:text-xl font-semibold">Transactions</h1>
+            <p className="text-xs sm:text-sm text-muted-foreground">Monitor every payment, transfer, and withdrawal in one place.</p>
           </div>
-          <div className="flex w-full flex-col gap-3 md:flex-row md:flex-nowrap md:items-center md:justify-end">
-            <div className="text-left md:mr-6 md:text-right">
-              <p className="text-xs uppercase tracking-wide text-muted-foreground">Balance</p>
-              <p className="text-2xl font-semibold">{formatCurrency(summary.balance)}</p>
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="text-left sm:mr-4">
+              <p className="text-[10px] sm:text-xs uppercase tracking-wide text-muted-foreground">Balance</p>
+              <p className="text-lg sm:text-xl font-semibold">{formatCurrency(summary.balance)}</p>
             </div>
-            <Button className="w-full md:w-auto" asChild variant="secondary">
-              <Link to="/transactions/history">Transaction History</Link>
+            <Button size="sm" asChild variant="secondary" className="rounded-lg">
+              <Link to="/transactions/history">History</Link>
             </Button>
-            <Button className="w-full md:w-auto" asChild variant="outline">
+            <Button size="sm" asChild variant="outline" className="rounded-lg">
               <Link to="/transfers">New Transfer</Link>
             </Button>
-            <Button className="w-full md:w-auto" variant="outline" onClick={handleExport}>
-              <IconExport className="mr-2 h-4 w-4" /> Export CSV
+            <Button size="sm" variant="outline" className="rounded-lg" onClick={handleExport}>
+              <IconExport className="h-3.5 w-3.5 mr-1.5" /> Export
             </Button>
           </div>
         </div>
@@ -303,8 +303,8 @@ export default function TransactionsPage() {
             />
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <Button className="w-full sm:w-auto" variant="outline" onClick={resetFilters}>Reset</Button>
-            <Button className="w-full sm:w-auto" variant="secondary" onClick={refetch}>Refresh</Button>
+            <Button className="w-full sm:w-auto rounded-lg" variant="outline" onClick={resetFilters}>Reset</Button>
+            <Button className="w-full sm:w-auto rounded-lg" variant="secondary" onClick={refetch}>Refresh</Button>
           </div>
         </div>
       </div>
@@ -312,22 +312,22 @@ export default function TransactionsPage() {
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <div className="rounded-2xl border bg-white p-4 shadow-sm">
           <p className="text-xs uppercase text-muted-foreground">Transactions</p>
-          <p className="mt-1 text-2xl font-semibold">{summary.count}</p>
+          <p className="mt-1 text-lg sm:text-xl font-semibold">{summary.count}</p>
           <p className="text-xs text-muted-foreground">Filtered results</p>
         </div>
         <div className="rounded-2xl border bg-white p-4 shadow-sm">
           <p className="text-xs uppercase text-muted-foreground">Received</p>
-          <p className="mt-1 text-2xl font-semibold text-emerald-600">{formatCurrency(Math.abs(summary.received))}</p>
+          <p className="mt-1 text-lg sm:text-xl font-semibold text-emerald-600">{formatCurrency(Math.abs(summary.received))}</p>
           <p className="text-xs text-muted-foreground">Total inflow</p>
         </div>
         <div className="rounded-2xl border bg-white p-4 shadow-sm">
           <p className="text-xs uppercase text-muted-foreground">Paid</p>
-          <p className="mt-1 text-2xl font-semibold text-rose-600">{formatCurrency(Math.abs(summary.paid))}</p>
+          <p className="mt-1 text-lg sm:text-xl font-semibold text-rose-600">{formatCurrency(Math.abs(summary.paid))}</p>
           <p className="text-xs text-muted-foreground">Total outflow</p>
         </div>
         <div className="rounded-2xl border bg-white p-4 shadow-sm">
           <p className="text-xs uppercase text-muted-foreground">Net</p>
-          <p className="mt-1 text-2xl font-semibold">{formatCurrency(summary.net)}</p>
+          <p className="mt-1 text-lg sm:text-xl font-semibold">{formatCurrency(summary.net)}</p>
           <p className="text-xs text-muted-foreground">Inflow minus outflow</p>
         </div>
       </div>
@@ -338,7 +338,7 @@ export default function TransactionsPage() {
             <CardTitle>Quick Add Transaction</CardTitle>
             <p className="text-sm text-muted-foreground">Capture a new income, expense, or transfer without leaving this screen.</p>
           </div>
-          <Button size="sm" variant="outline" onClick={refetch}>Refresh List</Button>
+          <Button size="sm" variant="outline" className="rounded-lg" onClick={refetch}>Refresh List</Button>
         </CardHeader>
         <CardContent>
           <TransactionForm onCreated={refetch} initialScope={scope === 'all' ? undefined : scope} />
@@ -410,7 +410,7 @@ export default function TransactionsPage() {
                     <td className="px-6 py-4">{tx.categoryName || 'Uncategorised'}</td>
                     <td className="px-6 py-4 text-muted-foreground">{tx.notes || 'N/A'}</td>
                     <td className="px-6 py-4 text-right">
-                      <Button size="sm" variant="outline" onClick={() => openDetails(tx)}>Details</Button>
+                      <Button size="sm" variant="outline" className="rounded-lg" onClick={() => openDetails(tx)}>Details</Button>
                     </td>
                   </tr>
                 )

@@ -8,6 +8,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import MoneyInput from '../components/fields/MoneyInput'
 import { Dialog, DialogContent, DialogTitle } from '../components/ui/dialog'
 import { formatCurrency } from '../lib/format'
+import { RefreshCcw, Plus, ClipboardList } from 'lucide-react'
+import { TextField } from '@mui/material'
+import { useAuth } from '../lib/auth'
 import {
   createProjectProfile,
   deleteProjectProfile,
@@ -65,6 +68,7 @@ function createEmptyForm(): CreateFormState {
 
 export default function ConstructionProjectsPage() {
   const navigate = useNavigate()
+  const { user } = useAuth()
   const [projects, setProjects] = useState<ProjectProfile[]>([])
   const [loading, setLoading] = useState(true)
   const [query, setQuery] = useState('')
@@ -87,7 +91,14 @@ export default function ConstructionProjectsPage() {
   }, [])
 
   useEffect(() => {
-    loadProjects(true)
+    // Reload projects when user changes (login/logout/switch user)
+    if (user?.id) {
+      loadProjects(true)
+    } else {
+      // Clear projects when no user
+      setProjects([])
+      setLoading(false)
+    }
     const handler = () => {
       loadProjects(false).catch(() => undefined)
     }
@@ -95,7 +106,7 @@ export default function ConstructionProjectsPage() {
     return () => {
       window.removeEventListener('construction:projects:changed', handler)
     }
-  }, [loadProjects])
+  }, [loadProjects, user?.id])
 
   const filteredProjects = useMemo(() => {
     const term = query.trim().toLowerCase()
@@ -178,25 +189,55 @@ export default function ConstructionProjectsPage() {
         completed={portfolioSummary.completed}
         totalBudget={portfolioSummary.totalBudget}
         totalSpend={portfolioSummary.totalSpend}
-        onCreate={() => setCreateOpen(true)}
+        onCreate={() => {}}
       />
 
-      <Filters
-        query={query}
-        onQueryChange={setQuery}
-        statusFilter={statusFilter}
-        onStatusChange={setStatusFilter}
-        onRefresh={() => loadProjects(true)}
-      />
-
-      <section className="space-y-4">
-        <div className="flex items-center justify-between gap-2 flex-wrap">
-          <h2 className="text-lg font-semibold">Project Profiles</h2>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" onClick={() => loadProjects(true)}>Refresh</Button>
-            <Button onClick={() => setCreateOpen(true)}>New Project</Button>
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-semibold text-foreground">Project Profiles</h2>
+            <p className="text-sm text-muted-foreground mt-1">Manage your construction projects</p>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => navigate('/construction/price-analysis')}
+              className="gap-2"
+            >
+              <ClipboardList className="h-4 w-4" />
+              Planning
+            </Button>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => loadProjects(true)}
+              className="gap-2"
+            >
+              <RefreshCcw className="h-4 w-4" />
+              Refresh
+            </Button>
+            <Button 
+              size="sm" 
+              onClick={() => setCreateOpen(true)}
+              className="gap-2"
+            >
+              <Plus className="h-4 w-4" />
+              New Project
+            </Button>
           </div>
         </div>
+
+        <Filters
+          query={query}
+          onQueryChange={setQuery}
+          statusFilter={statusFilter}
+          onStatusChange={setStatusFilter}
+          onRefresh={() => loadProjects(true)}
+        />
+      </div>
+
+      <section className="space-y-4">
 
         {loading ? (
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -256,31 +297,23 @@ function HeroSummary({ projects, active, completed, totalBudget, totalSpend, onC
   const gradient = 'linear-gradient(135deg, rgba(59,130,246,0.95), rgba(126,34,206,0.95))'
   return (
     <div
-      className="rounded-3xl border border-white/10 bg-primary/90 text-primary-foreground shadow-xl"
+      className="rounded-2xl border border-white/10 bg-primary/90 text-primary-foreground shadow-xl"
       style={{ backgroundImage: gradient }}
     >
-      <div className="p-6 md:p-8 flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
-        <div className="space-y-3 max-w-2xl">
+      <div className="p-5 sm:p-6 md:p-8 flex flex-col gap-4 sm:gap-6 md:flex-row md:items-center md:justify-between">
+        <div className="space-y-2 sm:space-y-3 max-w-2xl">
           <p className="text-xs uppercase tracking-[0.25em] text-white/70">Construction cockpit</p>
-          <h1 className="text-2xl md:text-3xl font-semibold">Design beautiful project profiles & control every transfer</h1>
+          <h1 className="text-lg sm:text-xl md:text-2xl font-semibold">Design beautiful project profiles & control every transfer</h1>
           <p className="text-sm text-white/80">
             Keep unlimited projects, capture custom inputs, link bank accounts, and monitor each payment or transfer with richly detailed reports.
           </p>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs text-white/80">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 text-xs text-white/80">
             <SummaryStat label="Total projects" value={projects.toString()} />
             <SummaryStat label="Active" value={active.toString()} />
             <SummaryStat label="Completed" value={completed.toString()} />
             <SummaryStat label="Portfolio spend" value={formatCurrency(totalSpend)} />
             <SummaryStat label="Portfolio budget" value={formatCurrency(totalBudget)} className="sm:col-span-2" />
           </div>
-        </div>
-        <div className="flex flex-col items-end gap-3">
-          <Button size="lg" variant="secondary" className="bg-white text-primary hover:bg-white/90" onClick={onCreate}>
-            Create Project
-          </Button>
-          <p className="text-xs text-white/70 max-w-xs text-right">
-            Configure accents, add parent hierarchies, attach accounts, and log every transaction with one click.
-          </p>
         </div>
       </div>
     </div>
@@ -297,7 +330,7 @@ function SummaryStat({ label, value, className }: SummaryStatProps) {
   return (
     <div className={`rounded-xl bg-black/20 px-4 py-3 ${className ?? ''}`}>
       <p className="text-[11px] uppercase tracking-wide text-white/60">{label}</p>
-      <p className="mt-1 text-lg font-semibold text-white">{value}</p>
+      <p className="mt-1 text-base sm:text-lg font-semibold text-white">{value}</p>
     </div>
   )
 }
@@ -312,23 +345,24 @@ type FiltersProps = {
 
 function Filters({ query, onQueryChange, statusFilter, onStatusChange, onRefresh }: FiltersProps) {
   return (
-    <div className="flex flex-col gap-3 rounded-2xl border border-border/60 bg-card/80 p-4 shadow-sm md:flex-row md:items-center md:justify-between">
-      <div className="flex flex-1 items-center gap-3">
+    <div className="flex flex-col gap-3 rounded-xl border border-border/60 bg-card/80 p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-1 items-center gap-2">
         <Input
+          size="default"
           value={query}
           onChange={(event) => onQueryChange(event.target.value)}
-          placeholder="Search by project name, client, location..."
-          className="h-11 rounded-xl"
+          placeholder="Search projects..."
+          className="flex-1"
         />
         {query && (
-          <Button variant="ghost" onClick={() => onQueryChange('')} className="h-11">
+          <Button variant="ghost" size="sm" onClick={() => onQueryChange('')}>
             Clear
           </Button>
         )}
       </div>
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2">
         <Select value={statusFilter} onValueChange={(value) => onStatusChange(value as FilterStatus)}>
-          <SelectTrigger className="w-40 h-11 rounded-xl">
+          <SelectTrigger className="w-32 h-9 rounded-lg text-sm">
             <SelectValue placeholder="All statuses" />
           </SelectTrigger>
           <SelectContent>
@@ -340,9 +374,6 @@ function Filters({ query, onQueryChange, statusFilter, onStatusChange, onRefresh
             ))}
           </SelectContent>
         </Select>
-        <Button variant="outline" className="h-11" onClick={onRefresh}>
-          Sync
-        </Button>
       </div>
     </div>
   )
@@ -441,13 +472,18 @@ function CreateProjectDialog({ open, onOpenChange, form, onFormChange, onSubmit,
             />
           </div>
           <div className="md:col-span-2">
-            <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Description</label>
-            <textarea
+            <TextField
+              id="outlined-description"
+              label="Description"
               value={form.description}
-              onChange={(event) => updateForm({ description: event.target.value })}
+              onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
+                updateForm({ description: event.target.value })
+              }}
               placeholder="Short note about the project, milestones, or deliverables"
-              className="mt-1 w-full rounded-xl border border-input bg-transparent px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+              multiline
               rows={3}
+              fullWidth
+              className="mt-1"
             />
           </div>
           <div className="md:col-span-2">
@@ -503,7 +539,7 @@ function ProjectCard({ project, onOpen, onDelete }: ProjectCardProps) {
     <Card className="relative flex h-full flex-col overflow-hidden border border-border/80 bg-card/80">
       <CardHeader className="pb-0">
         <CardTitle className="flex items-start justify-between gap-3">
-          <span className="text-lg font-semibold leading-snug">{project.name}</span>
+          <span className="text-base sm:text-lg font-semibold leading-snug">{project.name}</span>
           <span
             className="inline-flex items-center rounded-full px-3 py-1 text-[11px] font-medium text-white shadow-sm"
             style={{ background: gradient }}
@@ -569,10 +605,10 @@ function ProjectCard({ project, onOpen, onDelete }: ProjectCardProps) {
           </div>
         ) : null}
         <div className="mt-auto flex items-center justify-between gap-2 pt-4">
-          <Button variant="ghost" size="sm" onClick={onDelete} className="text-red-600 hover:bg-red-50">
-            Delete
-          </Button>
-          <Button size="sm" onClick={onOpen}>
+          <Button variant="ghost" size="sm" onClick={onDelete} className="text-red-600 hover:bg-red-50 rounded-lg">
+          Delete
+        </Button>
+        <Button size="sm" className="rounded-lg" onClick={onOpen}>
             Open profile
           </Button>
         </div>
