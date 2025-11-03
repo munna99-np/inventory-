@@ -1,8 +1,7 @@
-import * as React from 'react'
 import { Input, InputProps } from './input'
 import { ActionButton, ActionButtonProps } from './action-button'
 import { cn } from '../../lib/utils'
-import { Search, Plus, Filter, RefreshCcw, Download, X } from 'lucide-react'
+import { Search, X } from 'lucide-react'
 
 export interface SearchBarProps {
   value: string

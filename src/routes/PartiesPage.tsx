@@ -46,7 +46,6 @@ export default function PartiesPage() {
           value={search}
           onChange={setSearch}
           placeholder="Search parties…"
-          size="default"
           actions={[
             {
               label: 'Export Report',

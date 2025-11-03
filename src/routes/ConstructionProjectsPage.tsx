@@ -293,7 +293,7 @@ type HeroSummaryProps = {
   onCreate: () => void
 }
 
-function HeroSummary({ projects, active, completed, totalBudget, totalSpend, onCreate }: HeroSummaryProps) {
+function HeroSummary({ projects, active, completed, totalBudget, totalSpend, onCreate: _onCreate }: HeroSummaryProps) {
   const gradient = 'linear-gradient(135deg, rgba(59,130,246,0.95), rgba(126,34,206,0.95))'
   return (
     <div
@@ -343,12 +343,11 @@ type FiltersProps = {
   onRefresh: () => void
 }
 
-function Filters({ query, onQueryChange, statusFilter, onStatusChange, onRefresh }: FiltersProps) {
+function Filters({ query, onQueryChange, statusFilter, onStatusChange, onRefresh: _onRefresh }: FiltersProps) {
   return (
     <div className="flex flex-col gap-3 rounded-xl border border-border/60 bg-card/80 p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
       <div className="flex flex-1 items-center gap-2">
         <Input
-          size="default"
           value={query}
           onChange={(event) => onQueryChange(event.target.value)}
           placeholder="Search projects..."

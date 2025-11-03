@@ -112,7 +112,8 @@ export async function updateWithOffline<T extends { id: string }>(
         for (const item of dataArray) {
           await offlineStorage.addToSyncQueue(table, 'UPDATE', item)
         }
-        return { data: null, error: new Error(errors[0].error.message) }
+        const firstErr = errors[0]?.error
+        return { data: null, error: new Error(firstErr?.message ?? 'Update failed') }
       }
 
       const updatedData = results.map((r) => r.data as T)
