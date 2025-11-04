@@ -184,7 +184,7 @@ export default function AppLayout() {
               </>
             ) : (
               <Button asChild>
-                <Link to="/signin">Sign in</Link>
+                <Link to="/login">Sign in</Link>
               </Button>
             )}
           </div>
