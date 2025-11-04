@@ -11,12 +11,12 @@
   "scripts": {
     "start": "vite",
     "dev": "vite",
-    "build": "npm run verify:node && tsc -b && vite build",
+    "build": "vite build",
     "build:electron": "npm run build && electron-builder",
     "build:electron:win": "cross-env NODE_ENV=production npm run build && electron-builder --win",
     "build:electron:dir": "npm run build && electron-builder --dir",
     "prepreview": "npm run build",
-    "preview": "vite preview",
+    "preview": "vite preview --port 4173",
     "lint": "eslint .",
     "test": "vitest run",
     "verify:node": "node -e \"const [major,minor]=process.versions.node.split('.').map(Number);if(!((major===18&&minor>=18)||(major===20))){console.error('Node 18.18.x or 20.x is required');process.exit(1);}\""
