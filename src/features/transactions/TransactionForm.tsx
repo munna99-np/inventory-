@@ -13,6 +13,8 @@ import { useAccounts } from '../../hooks/useAccounts'
 import { useCategories } from '../../hooks/useCategories'
 import { useParties } from '../../hooks/useParties'
 import { supabase } from '../../lib/supabaseClient'
+import { INFLOW_SOURCE_GROUPS } from '../../lib/inflowSources'
+import type { InflowSource } from '../../types/projects'
 import { toast } from 'sonner'
 
 const formSchema = transactionSchema.extend({
@@ -54,6 +56,15 @@ export default function TransactionForm({ onCreated, initialScope }: { onCreated
       form.setValue('category_id', null)
       form.setValue('sub_category_id', null)
       form.setValue('party_id', null)
+      form.setValue('inflowSource', null)
+    }
+    if (direction === 'in') {
+      form.setValue('category_id', null)
+      form.setValue('sub_category_id', null)
+      form.setValue('party_id', null)
+    }
+    if (direction === 'out') {
+      form.setValue('inflowSource', null)
     }
   }, [direction, form])
 
@@ -115,22 +126,33 @@ export default function TransactionForm({ onCreated, initialScope }: { onCreated
         toast.error('Amount is required')
         return
       }
-      const finalCategoryId = values.sub_category_id || values.category_id
-      if (!finalCategoryId) {
-        toast.error('Please choose a category before saving')
-        return
-      }
-      const needsParty = categories.find((c) => c.id === finalCategoryId)?.name
-      if (needsParty && PARTY_REQUIRED_FOR.has(needsParty.toLowerCase()) && !values.party_id) {
-        toast.error('Party required for selected category')
-        return
+      let finalCategoryId: string | null = null
+      if (direction === 'in') {
+        // For inflow, require inflowSource instead of category
+        if (!values.inflowSource) {
+          toast.error('Please select an inflow source')
+          return
+        }
+      } else {
+        // For outflow, require category
+        finalCategoryId = (values.sub_category_id || values.category_id) || null
+        if (!finalCategoryId) {
+          toast.error('Please choose a category before saving')
+          return
+        }
+        const needsParty = categories.find((c) => c.id === finalCategoryId)?.name
+        if (needsParty && PARTY_REQUIRED_FOR.has(needsParty.toLowerCase()) && !values.party_id) {
+          toast.error('Party required for selected category')
+          return
+        }
       }
       const absolute = Math.abs(values.amount)
       const signedAmount = values.direction === 'out' ? -absolute : absolute
-      const { sub_category_id: _ignoredSubCategory, ...rest } = values
+      const { sub_category_id: _ignoredSubCategory, inflowSource, ...rest } = values
       const payload = {
         ...rest,
         category_id: finalCategoryId ?? null,
+        inflow_source: inflowSource ?? null,
         amount: signedAmount,
         qty: rest.qty ?? null,
         date: rest.date.toISOString().slice(0, 10),
@@ -140,7 +162,7 @@ export default function TransactionForm({ onCreated, initialScope }: { onCreated
       setSubmitting(false)
       if (error) return toast.error(error.message)
       toast.success('Transaction added')
-      form.reset({ direction: 'out', scope: values.scope, date: new Date(), category_id: null, sub_category_id: null, party_id: null } as any)
+      form.reset({ direction: 'out', scope: values.scope, date: new Date(), category_id: null, sub_category_id: null, party_id: null, inflowSource: null } as any)
       onCreated?.()
     } else {
       const amt = Math.abs(values.amount || 0)
@@ -200,7 +222,35 @@ export default function TransactionForm({ onCreated, initialScope }: { onCreated
           />
         </FormField>
 
-        {direction !== 'transfer' && (
+        {direction === 'in' && (
+          <FormField 
+            label="Inflow Source" 
+            htmlFor="inflowSource" 
+            required
+            description="Select where this inflow is coming from"
+            className="sm:col-span-2"
+          >
+            <select
+              id="inflowSource"
+              className="h-10 w-full rounded-md border border-input bg-background px-4 py-2 text-base shadow-sm transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 sm:h-11"
+              value={form.watch('inflowSource') || ''}
+              onChange={(event) => form.setValue('inflowSource', (event.target.value as InflowSource) || null)}
+            >
+              <option value="">Select inflow source</option>
+              {Object.entries(INFLOW_SOURCE_GROUPS).map(([category, sources]) => (
+                <optgroup key={category} label={category}>
+                  {sources.map((source) => (
+                    <option key={source.value} value={source.value}>
+                      {source.label}
+                    </option>
+                  ))}
+                </optgroup>
+              ))}
+            </select>
+          </FormField>
+        )}
+
+        {direction === 'out' && (
           <FormField 
             label="Category" 
             htmlFor="category_id" 
@@ -222,7 +272,7 @@ export default function TransactionForm({ onCreated, initialScope }: { onCreated
           </FormField>
         )}
 
-        {direction !== 'transfer' && categoryId && (
+        {direction === 'out' && categoryId && (
           <FormField 
             label="Sub-category" 
             htmlFor="sub_category_id"
@@ -254,7 +304,7 @@ export default function TransactionForm({ onCreated, initialScope }: { onCreated
           </FormField>
         )}
 
-        {showParty && (
+        {showParty && direction === 'out' && (
           <FormField label="Party" htmlFor="party_id" required>
             <select 
               id="party_id"

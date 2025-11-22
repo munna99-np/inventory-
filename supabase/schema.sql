@@ -38,6 +38,9 @@ create table if not exists parties (
   id uuid primary key default gen_random_uuid(),
   name text not null,
   phone text,
+  email text,
+  address text,
+  type text default 'company' check (type in ('company', 'personal')),
   notes text,
   owner uuid not null default auth.uid() references profiles(id) on delete cascade,
   unique (owner, name)
@@ -65,6 +68,7 @@ create table if not exists transactions (
   mode text,
   category_id uuid references categories(id),
   party_id uuid references parties(id),
+  inflow_source text,
   notes text,
   created_at timestamptz not null default now(),
   owner uuid not null default auth.uid() references profiles(id) on delete cascade
@@ -74,6 +78,7 @@ create index if not exists idx_tx_owner_date on transactions(owner, date);
 create index if not exists idx_tx_owner_category on transactions(owner, category_id);
 create index if not exists idx_tx_owner_party on transactions(owner, party_id);
 create index if not exists idx_tx_owner_account on transactions(owner, account_id);
+create index if not exists idx_tx_inflow_source on transactions(owner, inflow_source) where inflow_source is not null;
 
 -- Transfers
 create table if not exists transfers (

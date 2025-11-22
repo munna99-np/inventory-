@@ -25,13 +25,14 @@ function normaliseTransaction(row: any): Transaction {
     ...row,
     amount: Number.isFinite(amount) ? amount : 0,
     qty,
+    inflowSource: row.inflow_source ?? row.inflowSource ?? null,
   } as Transaction
 }
 
 function buildQuery(activeFilters: TxFilters) {
   let query = supabase
     .from('transactions')
-    .select('id,account_id,date,amount,qty,direction,scope,mode,category_id,party_id,notes')
+    .select('id,account_id,date,amount,qty,direction,scope,mode,category_id,party_id,notes,inflow_source')
     .order('date', { ascending: false })
 
   if (activeFilters.accountId) query = query.eq('account_id', activeFilters.accountId)

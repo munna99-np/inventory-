@@ -42,27 +42,33 @@ export default function SignInPage() {
     try {
       const { error } = await supabase.auth.signInWithPassword(values)
       if (error) {
-        if (error.message.toLowerCase().includes('invalid')) {
-          // Attempt to create the admin user automatically
-          try {
-            const { error: signupErr } = await supabase.auth.signUp({
-              email: values.email,
-              password: values.password,
-              options: { data: { full_name: 'Admin' } },
-            })
-            if (signupErr) {
-              return toast.error(
-                `${signupErr.message}. Create this user in Supabase Auth (Users) and mark as confirmed, then try again.`
-              )
-            }
-            return toast.info(
-              'Admin user created. If email confirmation is required, confirm the email in Supabase or disable confirmations, then sign in again.'
-            )
-          } catch (signupError: any) {
-            return toast.error(signupError?.message || 'Failed to create user')
-          }
+        // Common Supabase auth error codes and messages
+        const errorMessage = error.message?.toLowerCase() || ''
+        
+        // Handle invalid credentials or user not found
+        if (
+          errorMessage.includes('invalid') ||
+          errorMessage.includes('user not found') ||
+          errorMessage.includes('unable to validate') ||
+          errorMessage.includes('invalid login credentials') ||
+          error.status === 400 ||
+          error.status === 401
+        ) {
+          return toast.error('Incorrect username or password')
         }
-        return toast.error(error.message)
+        
+        // Handle user not confirmed
+        if (errorMessage.includes('not confirmed') || errorMessage.includes('email not confirmed')) {
+          return toast.error('Please confirm your email before signing in')
+        }
+        
+        // Handle account disabled
+        if (errorMessage.includes('disabled') || errorMessage.includes('banned')) {
+          return toast.error('Your account has been disabled. Contact support.')
+        }
+        
+        // Default error message
+        return toast.error(error.message || 'Failed to sign in. Please try again.')
       }
       toast.success('Signed in')
       navigate(redirectTo, { replace: true })

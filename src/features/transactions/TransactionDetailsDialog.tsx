@@ -2,12 +2,14 @@ import clsx from 'clsx'
 import { Dialog, DialogContent, DialogTitle } from '../../components/ui/dialog'
 import { formatCurrency } from '../../lib/format'
 import { formatAppDateTime } from '../../lib/date'
+import { getInflowSourceLabel } from '../../lib/inflowSources'
 import type { Transaction } from '../../types/transactions'
 
 type TransactionWithMeta = (Transaction & {
   accountName?: string | null
   partyName?: string | null
   categoryName?: string | null
+  inflowSource?: string | null
 }) | null | undefined
 
 type TransactionDetailsDialogProps = {
@@ -73,10 +75,17 @@ export default function TransactionDetailsDialog({ transaction, open, onOpenChan
                 <p className="text-xs font-medium uppercase text-muted-foreground">Mode</p>
                 <p className="text-sm font-semibold">{transaction.mode || 'N/A'}</p>
               </div>
-              <div className="rounded-lg border p-4">
-                <p className="text-xs font-medium uppercase text-muted-foreground">Category</p>
-                <p className="text-sm font-semibold">{transaction.categoryName || 'N/A'}</p>
-              </div>
+              {transaction.direction === 'in' ? (
+                <div className="rounded-lg border p-4">
+                  <p className="text-xs font-medium uppercase text-muted-foreground">Inflow Source</p>
+                  <p className="text-sm font-semibold">{transaction.inflowSource ? getInflowSourceLabel(transaction.inflowSource as any) : 'N/A'}</p>
+                </div>
+              ) : (
+                <div className="rounded-lg border p-4">
+                  <p className="text-xs font-medium uppercase text-muted-foreground">Category</p>
+                  <p className="text-sm font-semibold">{transaction.categoryName || 'N/A'}</p>
+                </div>
+              )}
               <div className="rounded-lg border p-4">
                 <p className="text-xs font-medium uppercase text-muted-foreground">Party</p>
                 <p className="text-sm font-semibold">{transaction.partyName || 'N/A'}</p>

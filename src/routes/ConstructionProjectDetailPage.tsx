@@ -6,8 +6,10 @@ import { ArrowLeft, Edit3, FileText, RefreshCcw } from "lucide-react"
 import { Button } from "../components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card"
 import { formatCurrency } from "../lib/format"
+import { formatAppDate } from "../lib/date"
 import { cn } from "../lib/utils"
 import { getProjectProfile, summarizeProjectFlows } from "../services/projects"
+import { getInflowSourceLabel } from "../lib/inflowSources"
 import type { ProjectProfile } from "../types/projects"
 import { TenderBiddingAnalysisQuickAction } from "../features/projects/TenderBiddingAnalysisQuickAction"
 
@@ -203,8 +205,66 @@ export default function ConstructionProjectDetailPage() {
           </div>
         </CardContent>
       </Card>
+
+      <Card className="border border-border/60">
+        <CardHeader>
+          <CardTitle>Latest payments in</CardTitle>
+          <p className="text-sm text-muted-foreground">Reference the most recent inflows at a glance.</p>
+        </CardHeader>
+        <CardContent>
+          {!project?.flows?.some((f) => f.type === "payment-in") ? (
+            <div className="grid min-h-[140px] place-items-center rounded-xl border border-dashed border-border/60 bg-muted/20 text-sm text-muted-foreground">
+              No payments recorded yet.
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[640px] text-sm">
+                <thead className="text-left text-xs uppercase text-muted-foreground">
+                  <tr className="border-b border-border/60">
+                    <th className="py-2 pr-3 font-medium">Date</th>
+                    <th className="py-2 pr-3 font-medium">Account</th>
+                    <th className="py-2 pr-3 font-medium">Amount</th>
+                    <th className="py-2 pr-3 font-medium">Source</th>
+                    <th className="py-2 pr-3 font-medium">Counterparty</th>
+                    <th className="py-2 font-medium">Notes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {project.flows
+                    .filter((f) => f.type === "payment-in")
+                    .sort((a, b) => (b.date || "").localeCompare(a.date || ""))
+                    .slice(0, 5)
+                    .map((flow) => (
+                      <tr key={flow.id} className="border-b border-border/60 last:border-b-0">
+                        <td className="py-3 pr-3 text-muted-foreground">{formatDateDisplay(flow.date)}</td>
+                        <td className="py-3 pr-3 text-muted-foreground">{flow.accountName || "--"}</td>
+                        <td className="py-3 pr-3 text-emerald-600 font-medium">{formatCurrency(Number(flow.amount) || 0)}</td>
+                        <td className="py-3 pr-3">
+                          {flow.inflowSource ? (
+                            <span className="inline-block rounded-md bg-cyan-100 px-2.5 py-1.5 text-xs font-semibold text-cyan-900 border border-cyan-300">
+                              ✓ {getInflowSourceLabel(flow.inflowSource)}
+                            </span>
+                          ) : (
+                            <span className="text-muted-foreground">--</span>
+                          )}
+                        </td>
+                        <td className="py-3 pr-3 text-muted-foreground">{flow.counterparty || "--"}</td>
+                        <td className="py-3 text-muted-foreground">{flow.notes || "--"}</td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   )
+}
+
+function formatDateDisplay(value?: string): string {
+  const label = formatAppDate(value)
+  return label || "--"
 }
 
 type MetricProps = {

@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import MoneyInput from '../components/fields/MoneyInput'
 import { Dialog, DialogContent, DialogTitle } from '../components/ui/dialog'
 import { formatCurrency } from '../lib/format'
-import { RefreshCcw, Plus, ClipboardList } from 'lucide-react'
+import { RefreshCcw, Plus, ClipboardList, BarChart3, Zap, CheckCircle, Wallet, Briefcase } from 'lucide-react'
 import { TextField } from '@mui/material'
 import { useAuth } from '../lib/auth'
 import {
@@ -49,7 +49,7 @@ const STATUS_LABEL: Record<ProjectStatus, string> = {
   completed: 'Completed',
 }
 
-const ACCENT_PRESETS = ['#6366f1', '#0ea5e9', '#22c55e', '#f97316', '#a855f7', '#ec4899', '#14b8a6', '#64748b']
+const ACCENT_PRESETS = ['#0f12d6ff', '#014e72ff', '#00bb45ff', '#f97316', '#a855f7', '#ec4899', '#14b8a6', '#64748b']
 
 function createEmptyForm(): CreateFormState {
   return {
@@ -294,26 +294,72 @@ type HeroSummaryProps = {
 }
 
 function HeroSummary({ projects, active, completed, totalBudget, totalSpend, onCreate: _onCreate }: HeroSummaryProps) {
-  const gradient = 'linear-gradient(135deg, rgba(59,130,246,0.95), rgba(126,34,206,0.95))'
+  // Professional gradient: Deep Blue to Teal with accent
+  const gradient = 'linear-gradient(135deg, #1e3a8a 0%, #0369a1 50%, #06b6d4 100%)'
   return (
     <div
-      className="rounded-2xl border border-white/10 bg-primary/90 text-primary-foreground shadow-xl"
+      className="relative overflow-hidden rounded-3xl border border-cyan-500/20 shadow-2xl"
       style={{ backgroundImage: gradient }}
     >
-      <div className="p-5 sm:p-6 md:p-8 flex flex-col gap-4 sm:gap-6 md:flex-row md:items-center md:justify-between">
-        <div className="space-y-2 sm:space-y-3 max-w-2xl">
-          <p className="text-xs uppercase tracking-[0.25em] text-white/70">Construction cockpit</p>
-          <h1 className="text-lg sm:text-xl md:text-2xl font-semibold">Design beautiful project profiles & control every transfer</h1>
-          <p className="text-sm text-white/80">
-            Keep unlimited projects, capture custom inputs, link bank accounts, and monitor each payment or transfer with richly detailed reports.
-          </p>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 text-xs text-white/80">
-            <SummaryStat label="Total projects" value={projects.toString()} />
-            <SummaryStat label="Active" value={active.toString()} />
-            <SummaryStat label="Completed" value={completed.toString()} />
-            <SummaryStat label="Portfolio spend" value={formatCurrency(totalSpend)} />
-            <SummaryStat label="Portfolio budget" value={formatCurrency(totalBudget)} className="sm:col-span-2" />
+      {/* Decorative elements */}
+      <div className="absolute top-0 right-0 w-96 h-96 bg-gradient-to-br from-cyan-400/10 to-transparent rounded-full -mr-48 -mt-48 blur-3xl" />
+      <div className="absolute bottom-0 left-0 w-72 h-72 bg-gradient-to-tr from-blue-400/10 to-transparent rounded-full -ml-36 -mb-36 blur-3xl" />
+      
+      <div className="relative p-8 sm:p-10 md:p-12 flex flex-col gap-8 sm:gap-10">
+        {/* Header Section */}
+        <div className="space-y-3 sm:space-y-4 max-w-4xl">
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-cyan-400/15 border border-cyan-400/30 rounded-full w-fit">
+            <div className="w-2 h-2 bg-cyan-300 rounded-full animate-pulse" />
+            <p className="text-xs uppercase tracking-widest text-cyan-200 font-semibold">Construction Cockpit Devlop by Saroj pandey</p>
           </div>
+          
+          <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-white leading-tight">
+            Design Beautiful Project Profiles
+          </h1>
+          <h2 className="text-lg sm:text-xl text-cyan-100 font-medium leading-relaxed">
+            Control every transfer with precision & monitoring
+          </h2>
+          
+          <p className="text-sm sm:text-base text-blue-100/90 leading-relaxed max-w-2xl pt-1">
+            Keep unlimited projects, capture custom inputs, link bank accounts, and monitor every payment with richly detailed reports and analytics.
+          </p>
+        </div>
+
+        {/* Stats Grid */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 sm:gap-4">
+          <SummaryStat 
+            label="Total Projects" 
+            value={projects.toString()} 
+            icon={<BarChart3 className="w-5 h-5" />}
+            highlight={projects > 0}
+          />
+          <SummaryStat 
+            label="Active" 
+            value={active.toString()} 
+            icon={<Zap className="w-5 h-5" />}
+            highlight={active > 0}
+            className="sm:col-span-1"
+          />
+          <SummaryStat 
+            label="Completed" 
+            value={completed.toString()} 
+            icon={<CheckCircle className="w-5 h-5" />}
+            highlight={completed > 0}
+          />
+          <SummaryStat 
+            label="Portfolio Spend" 
+            value={formatCurrency(totalSpend)} 
+            icon={<Wallet className="w-5 h-5" />}
+            size="sm"
+            className="md:col-span-1"
+          />
+          <SummaryStat 
+            label="Budget" 
+            value={formatCurrency(totalBudget)} 
+            icon={<Briefcase className="w-5 h-5" />}
+            size="sm"
+            className="md:col-span-1"
+          />
         </div>
       </div>
     </div>
@@ -324,13 +370,35 @@ type SummaryStatProps = {
   label: string
   value: string
   className?: string
+  icon?: React.ReactNode
+  highlight?: boolean
+  size?: 'sm' | 'md'
 }
 
-function SummaryStat({ label, value, className }: SummaryStatProps) {
+function SummaryStat({ label, value, className, icon, highlight = false, size = 'md' }: SummaryStatProps) {
+  const isSm = size === 'sm'
   return (
-    <div className={`rounded-xl bg-black/20 px-4 py-3 ${className ?? ''}`}>
-      <p className="text-[11px] uppercase tracking-wide text-white/60">{label}</p>
-      <p className="mt-1 text-base sm:text-lg font-semibold text-white">{value}</p>
+    <div 
+      className={`relative overflow-hidden rounded-2xl p-4 sm:p-5 transition-all duration-300 hover:scale-105 group ${
+        highlight 
+          ? 'bg-gradient-to-br from-cyan-400/25 to-blue-400/15 border border-cyan-300/40 shadow-lg shadow-cyan-500/20' 
+          : 'bg-white/10 border border-white/15 backdrop-blur-sm hover:bg-white/15'
+      } ${className ?? ''}`}
+    >
+      {/* Background accent */}
+      <div className={`absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-cyan-300/10 to-transparent rounded-full -mr-12 -mt-12 blur-xl group-hover:blur-2xl transition-all ${highlight ? 'opacity-100' : 'opacity-0'}`} />
+      
+      <div className="relative space-y-1.5">
+        <div className="flex items-center gap-2">
+          {icon && <div className="text-cyan-300">{icon}</div>}
+          <p className={`uppercase tracking-wider text-white/70 font-semibold ${isSm ? 'text-[10px]' : 'text-[11px]'}`}>
+            {label}
+          </p>
+        </div>
+        <p className={`font-bold text-white drop-shadow-lg ${isSm ? 'text-lg sm:text-xl' : 'text-xl sm:text-2xl'}`}>
+          {value}
+        </p>
+      </div>
     </div>
   )
 }
@@ -525,6 +593,7 @@ type ProjectCardProps = {
 }
 
 function ProjectCard({ project, onOpen, onDelete }: ProjectCardProps) {
+  const navigate = useNavigate()
   const summary = useMemo(() => summarizeProjectFlows(project), [project])
   const accent = project.accentColor ?? '#6366f1'
   const gradient = accentGradient(accent)
@@ -533,6 +602,11 @@ function ProjectCard({ project, onOpen, onDelete }: ProjectCardProps) {
   const progress = budget ? Math.min(100, Math.round((spend / budget) * 100)) : 0
   const overspend = budget ? spend > budget : false
   const featuredFields = project.customFields.slice(0, 3)
+
+  const handlePaymentIn = () => navigate(`/construction/${project.id}/payments/in`)
+  const handlePaymentOut = () => navigate(`/construction/${project.id}/payments/out`)
+  const handleTransfer = () => navigate(`/construction/${project.id}/payments/transfer`)
+  const handleStatement = () => navigate(`/construction/${project.id}/statement`)
 
   return (
     <Card className="relative flex h-full flex-col overflow-hidden border border-border/80 bg-card/80">
@@ -603,6 +677,46 @@ function ProjectCard({ project, onOpen, onDelete }: ProjectCardProps) {
             ) : null}
           </div>
         ) : null}
+
+        {/* Quick Action Buttons */}
+        <div className="mt-4 pt-4 border-t border-border/40 space-y-3">
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Quick Actions</p>
+          <div className="grid grid-cols-2 gap-2">
+            <Button 
+              size="sm" 
+              variant="outline"
+              onClick={handlePaymentIn}
+              className="text-emerald-700 border-emerald-200 hover:bg-emerald-50 text-xs"
+            >
+              Payment In
+            </Button>
+            <Button 
+              size="sm" 
+              variant="outline"
+              onClick={handlePaymentOut}
+              className="text-rose-700 border-rose-200 hover:bg-rose-50 text-xs"
+            >
+              Payment Out
+            </Button>
+            <Button 
+              size="sm" 
+              variant="outline"
+              onClick={handleTransfer}
+              className="text-sky-700 border-sky-200 hover:bg-sky-50 text-xs"
+            >
+              Transfer
+            </Button>
+            <Button 
+              size="sm" 
+              variant="outline"
+              onClick={handleStatement}
+              className="text-indigo-700 border-indigo-200 hover:bg-indigo-50 text-xs"
+            >
+              Statement
+            </Button>
+          </div>
+        </div>
+
         <div className="mt-auto flex items-center justify-between gap-2 pt-4">
           <Button variant="ghost" size="sm" onClick={onDelete} className="text-red-600 hover:bg-red-50 rounded-lg">
           Delete

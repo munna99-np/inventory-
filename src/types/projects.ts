@@ -34,6 +34,37 @@ export type ProjectCustomField = {
 
 export type ProjectFlowType = 'payment-in' | 'payment-out' | 'transfer'
 
+export type InflowSource = 
+  | 'client-payment'
+  | 'project-owner'
+  | 'advance-payment'
+  | 'ra-bill-payment'
+  | 'variation-payment'
+  | 'mobilization-advance'
+  | 'retention-release'
+  | 'final-bill-payment'
+  | 'material-refund'
+  | 'scrap-sale'
+  | 'equipment-rental'
+  | 'equipment-refund'
+  | 'subcontractor-refund'
+  | 'supplier-refund'
+  | 'excess-payment-return'
+  | 'security-deposit-return'
+  | 'bank-deposit'
+  | 'bank-loan'
+  | 'overdraft-received'
+  | 'bank-interest'
+  | 'cash-to-bank'
+  | 'bank-to-cash'
+  | 'petty-cash-return'
+  | 'office-income'
+  | 'owner-investment'
+  | 'misc-income'
+  | 'penalty-compensation'
+  | 'insurance-claim'
+  | 'tax-return'
+
 export type ProjectFlow = {
   id: string
   type: ProjectFlowType
@@ -51,6 +82,7 @@ export type ProjectFlow = {
   categoryName?: string
   purpose?: string
   notes?: string
+  inflowSource?: InflowSource
   createdAt: string
   updatedAt: string
 }
@@ -71,6 +103,7 @@ export type ProjectFlowInput = {
   categoryName?: string
   purpose?: string
   notes?: string
+  inflowSource?: InflowSource
 }
 
 export type ProjectProfile = {

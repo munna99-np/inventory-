@@ -1,8 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
-import jsPDF from 'jspdf'
-import autoTable from 'jspdf-autotable'
 import { ArrowLeft, Download, RefreshCcw } from 'lucide-react'
 
 import { Button } from '../components/ui/button'
@@ -10,75 +8,17 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Input } from '../components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select'
 import { formatCurrency } from '../lib/format'
-import { formatAppDate, formatAppDateTime } from '../lib/date'
+import { formatAppDate } from '../lib/date'
 import { cn } from '../lib/utils'
 import { getProjectProfile } from '../services/projects'
+import { getInflowSourceLabel } from '../lib/inflowSources'
+import { createProfessionalPDF, addProfessionalTable, addSummarySection, savePDF } from '../lib/pdfExport'
 import type { ProjectBankAccount, ProjectFlow, ProjectFlowType, ProjectProfile } from '../types/projects'
 
 const FLOW_TYPE_META: Record<ProjectFlowType, { label: string; badgeClass: string; amountClass: string }> = {
   'payment-in': { label: 'Payment In', badgeClass: 'border-emerald-200 bg-emerald-50 text-emerald-700', amountClass: 'text-emerald-600' },
   'payment-out': { label: 'Payment Out', badgeClass: 'border-rose-200 bg-rose-50 text-rose-700', amountClass: 'text-rose-600' },
   transfer: { label: 'Transfer', badgeClass: 'border-sky-200 bg-sky-50 text-sky-700', amountClass: 'text-sky-600' },
-}
-
-type PdfRgb = { r: number; g: number; b: number }
-
-const DEFAULT_PDF_ACCENT: PdfRgb = { r: 37, g: 99, b: 235 }
-
-function parseColorToPdfRgb(color?: string | null): PdfRgb | null {
-  if (!color) return null
-  const input = color.trim()
-  if (!input) return null
-  if (input.startsWith('#')) {
-    const hex = input.slice(1)
-    if (hex.length === 3) {
-      const [r, g, b] = hex.split('').map((char) => parseInt(char + char, 16))
-      if ([r, g, b].some((value) => Number.isNaN(value))) return null
-      return { r, g, b }
-    }
-    if (hex.length === 6) {
-      const [r, g, b] = [hex.slice(0, 2), hex.slice(2, 4), hex.slice(4, 6)].map((segment) => parseInt(segment, 16))
-      if ([r, g, b].some((value) => Number.isNaN(value))) return null
-      return { r, g, b }
-    }
-    return null
-  }
-  const rgbMatch = input.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/i)
-  if (rgbMatch) {
-    const [, rStr, gStr, bStr] = rgbMatch
-    const [r, g, b] = [Number(rStr), Number(gStr), Number(bStr)]
-    if ([r, g, b].some((value) => Number.isNaN(value))) return null
-    return { r, g, b }
-  }
-  return null
-}
-
-function resolvePdfTone(rgb: PdfRgb): 'dark' | 'light' {
-  const normalize = (value: number) => {
-    const channel = value / 255
-    return channel <= 0.03928 ? channel / 12.92 : Math.pow((channel + 0.055) / 1.055, 2.4)
-  }
-  const luminance =
-    0.2126 * normalize(rgb.r) + 0.7152 * normalize(rgb.g) + 0.0722 * normalize(rgb.b)
-  return luminance > 0.6 ? 'dark' : 'light'
-}
-
-function lightenPdfRgb(rgb: PdfRgb, ratio: number): PdfRgb {
-  const clamp = Math.max(0, Math.min(1, ratio))
-  return {
-    r: Math.round(rgb.r + (255 - rgb.r) * clamp),
-    g: Math.round(rgb.g + (255 - rgb.g) * clamp),
-    b: Math.round(rgb.b + (255 - rgb.b) * clamp),
-  }
-}
-
-function darkenPdfRgb(rgb: PdfRgb, ratio: number): PdfRgb {
-  const clamp = Math.max(0, Math.min(1, ratio))
-  return {
-    r: Math.round(rgb.r * (1 - clamp)),
-    g: Math.round(rgb.g * (1 - clamp)),
-    b: Math.round(rgb.b * (1 - clamp)),
-  }
 }
 
 type FiltersState = {
@@ -298,169 +238,128 @@ export default function ConstructionProjectStatementPage() {
     }
 
     setExporting(true)
+
+    const getErrorMessage = (err: unknown) => (err instanceof Error ? err.message : String(err))
+
     try {
-      const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' })
-      const now = new Date()
-      const marginX = 48
-      const headerHeight = 110
-      const baseText: PdfRgb = { r: 31, g: 41, b: 55 }
-      const accentRgb = parseColorToPdfRgb(project.accentColor) ?? DEFAULT_PDF_ACCENT
-      const headerTone = resolvePdfTone(accentRgb)
-      const headerText: PdfRgb = headerTone === 'dark' ? baseText : { r: 255, g: 255, b: 255 }
-      const tableHeader = darkenPdfRgb(accentRgb, 0.35)
-      const stripeFill = lightenPdfRgb(accentRgb, 0.88)
-      const infoSurface: PdfRgb = { r: 248, g: 250, b: 252 }
-      const outline: PdfRgb = { r: 226, g: 232, b: 240 }
-      const pageWidth = doc.internal.pageSize.getWidth()
+      // Create document with professional styling
+      const doc = createProfessionalPDF({
+        title: `${project.name} - Project Statement`,
+        subtitle: `Account: ${accountFilterLabel} | Period: ${periodLabel}`,
+        generatedAt: new Date(),
+        orientation: 'landscape',
+      })
 
-      doc.setFillColor(accentRgb.r, accentRgb.g, accentRgb.b)
-      doc.rect(0, 0, pageWidth, headerHeight, 'F')
+      let currentY = 100
 
-      doc.setTextColor(headerText.r, headerText.g, headerText.b)
-      doc.setFont('helvetica', 'bold')
-      doc.setFontSize(22)
-      doc.text(project.name, marginX, 54)
-      doc.setFont('helvetica', 'normal')
-      doc.setFontSize(12)
-      doc.text('Project statement export', marginX, 76)
-      doc.setFontSize(10)
-      doc.text(`Generated: ${formatDateTime(now)}`, marginX, 94)
-      doc.text(`Entries exported: ${totalFlowCount}`, marginX, 110)
-
-      doc.setFont('helvetica', 'normal')
-      doc.setFontSize(11)
-      doc.setTextColor(baseText.r, baseText.g, baseText.b)
-      const metaLines = [
-        `Account filter: ${accountFilterLabel}`,
-        `Period: ${periodLabel}`,
-        `Type filter: ${typeFilterLabel}`,
+      // Add summary table
+      const summaryBody = [
+        ['Payments in', `${formatCurrency(totals.in)} — ${formatCountLabel(countByType['payment-in'])}`],
+        ['Payments out', `${formatCurrency(totals.out)} — ${formatCountLabel(countByType['payment-out'])}`],
+        ['Transfers', `${formatCurrency(totals.transfers)} — ${formatCountLabel(countByType.transfer, 'transfer')}`],
+        ['Net cash', `${formatCurrency(totals.net)} — ${formatCountLabel(totalFlowCount)}`],
       ]
-      const trimmedSearch = filters.search.trim()
-      if (trimmedSearch) {
-        metaLines.push(`Search query: ${trimmedSearch}`)
+
+      currentY = addSummarySection(doc, 'Summary', summaryBody as [string, string][], currentY)
+      currentY += 10
+
+      // Sanitize and prepare flows table rows with defensive checks
+      const problems: Array<{ index: number; id?: string | number; message: string }> = []
+      const flowsBody = filteredFlows.reduce((acc: any[], flow, idx) => {
+        try {
+          const safeDate = flow?.date ? (() => {
+            try {
+              return formatDate(flow.date)
+            } catch (_) {
+              return 'Invalid date'
+            }
+          })() : 'Invalid date'
+
+          const typeLabel = FLOW_TYPE_META[flow?.type]?.label ?? (flow?.type ?? 'Unknown')
+
+          const accounts =
+            flow?.type === 'transfer'
+              ? `${flow?.fromAccountName ?? projectAccountMap.get(flow?.fromAccountId ?? '')?.label ?? 'Unlinked'} → ${
+                  flow?.toAccountName ?? projectAccountMap.get(flow?.toAccountId ?? '')?.label ?? 'Unlinked'
+                }`
+              : flow?.accountName ?? projectAccountMap.get(flow?.accountId ?? '')?.label ?? 'Unlinked'
+
+          const detail =
+            flow?.type === 'transfer'
+              ? flow?.purpose || '—'
+              : [flow?.counterparty, flow?.categoryName].filter(Boolean).join(' • ') || 'Uncategorised'
+
+          let source = '—'
+          if (flow?.type === 'payment-in' && flow?.inflowSource) {
+            try {
+              source = getInflowSourceLabel(flow.inflowSource)
+            } catch (e) {
+              // fallback to raw value if label helper misbehaves
+              source = String(flow.inflowSource)
+            }
+          }
+
+          const amountNum = Number(flow?.amount)
+          const amountDisplay = Number.isFinite(amountNum)
+            ? flow?.type === 'payment-in'
+              ? `+${formatCurrency(amountNum)}`
+              : flow?.type === 'payment-out'
+                ? `-${formatCurrency(amountNum)}`
+                : formatCurrency(amountNum)
+            : '—'
+
+          const notes = flow?.notes ? flow.notes.replace(/\s+/g, ' ').trim() : '—'
+
+          acc.push([safeDate, typeLabel, accounts, detail, source, amountDisplay, notes])
+        } catch (err) {
+          problems.push({ index: idx, id: (flow as any)?.id, message: getErrorMessage(err) })
+        }
+        return acc
+      }, [])
+
+      if (problems.length > 0) {
+        // Log problems for easier debugging; do not block the export if most rows are fine
+        console.warn('PDF export: encountered problems while preparing rows', problems)
       }
 
-      const infoPaddingX = 18
-      const infoPaddingY = 18
-      const infoLineHeight = 16
-      const infoHeight = infoPaddingY * 2 + infoLineHeight * (metaLines.length + 1)
-      let cursorY = headerHeight + 24
-      const boxWidth = pageWidth - marginX * 2
+      if (flowsBody.length === 0) {
+        toast.info('No valid entries to export after sanitization.')
+        setExporting(false)
+        return
+      }
 
-      doc.setFillColor(infoSurface.r, infoSurface.g, infoSurface.b)
-      doc.setDrawColor(outline.r, outline.g, outline.b)
-      doc.roundedRect(marginX, cursorY, boxWidth, infoHeight, 10, 10, 'FD')
-
-      doc.setFont('helvetica', 'bold')
-      doc.text('Filters applied', marginX + infoPaddingX, cursorY + infoPaddingY)
-      doc.setFont('helvetica', 'normal')
-      doc.setFontSize(10)
-      metaLines.forEach((line, index) => {
-        doc.text(line, marginX + infoPaddingX, cursorY + infoPaddingY + 18 + index * infoLineHeight)
-      })
-
-      cursorY += infoHeight + 24
-
-      autoTable(doc, {
-        startY: cursorY,
-        head: [['Summary', 'Value']],
-        body: [
-          ['Payments in', `${formatCurrency(totals.in)} — ${formatCountLabel(countByType['payment-in'])}`],
-          ['Payments out', `${formatCurrency(totals.out)} — ${formatCountLabel(countByType['payment-out'])}`],
-          ['Transfers', `${formatCurrency(totals.transfers)} — ${formatCountLabel(countByType.transfer, 'transfer')}`],
-          ['Net cash', `${formatCurrency(totals.net)} — ${formatCountLabel(totalFlowCount)}`],
-        ],
-        margin: { left: marginX, right: marginX },
-        theme: 'grid',
-        styles: {
-          fontSize: 11,
-          cellPadding: { top: 8, right: 12, bottom: 8, left: 12 },
-          textColor: [baseText.r, baseText.g, baseText.b],
-          fillColor: [255, 255, 255],
-          lineColor: [outline.r, outline.g, outline.b],
-          lineWidth: 0.6,
-          halign: 'left',
-          cellWidth: 'wrap',
-          overflow: 'linebreak',
-        },
-        headStyles: {
-          fontStyle: 'bold',
-          fontSize: 11,
-          fillColor: [tableHeader.r, tableHeader.g, tableHeader.b],
-          textColor: 255,
-          halign: 'left',
-          valign: 'middle',
-        },
-        columnStyles: {
-          0: { fontStyle: 'bold' },
-          1: { halign: 'left' },
-        },
-      })
-
-      const docAny = doc as any
-      cursorY = (docAny.lastAutoTable?.finalY ?? cursorY) + 24
-
-      autoTable(doc, {
-        startY: cursorY,
-        head: [['Date', 'Type', 'Account(s)', 'Details', 'Amount', 'Notes']],
-        body: filteredFlows.map((flow) => {
-          const accounts =
-            flow.type === 'transfer'
-              ? `${flow.fromAccountName ?? projectAccountMap.get(flow.fromAccountId ?? '')?.label ?? 'Unlinked'} -> ${
-                  flow.toAccountName ?? projectAccountMap.get(flow.toAccountId ?? '')?.label ?? 'Unlinked'
-                }`
-              : flow.accountName ?? projectAccountMap.get(flow.accountId ?? '')?.label ?? 'Unlinked account'
-          const detail =
-            flow.type === 'transfer'
-              ? flow.purpose || '--'
-              : [flow.counterparty, flow.categoryName].filter(Boolean).join(' • ') || 'Uncategorised'
-          const amountDisplay =
-            flow.type === 'payment-in'
-              ? `+${formatCurrency(flow.amount)}`
-              : flow.type === 'payment-out'
-                ? `-${formatCurrency(flow.amount)}`
-                : formatCurrency(flow.amount)
-          return [
-            formatDate(flow.date),
-            FLOW_TYPE_META[flow.type].label,
-            accounts,
-            detail,
-            amountDisplay,
-            flow.notes ? flow.notes.replace(/\s+/g, ' ').trim() : '',
-          ]
-        }),
-        margin: { left: marginX, right: marginX },
-        theme: 'grid',
-        styles: {
-          fontSize: 10,
-          cellPadding: { top: 8, right: 10, bottom: 8, left: 10 },
-          textColor: [baseText.r, baseText.g, baseText.b],
-          fillColor: [255, 255, 255],
-          lineColor: [outline.r, outline.g, outline.b],
-          lineWidth: 0.5,
-          valign: 'top',
-          cellWidth: 'wrap',
-          overflow: 'linebreak',
-        },
-        headStyles: {
-          fillColor: [tableHeader.r, tableHeader.g, tableHeader.b],
-          textColor: 255,
-          fontStyle: 'bold',
-          fontSize: 11,
-          valign: 'middle',
-        },
-        alternateRowStyles: { fillColor: [stripeFill.r, stripeFill.g, stripeFill.b] },
-        columnStyles: {
-          4: { halign: 'right', fontStyle: 'bold' },
-        },
-      })
+      // Add table to the document
+      try {
+        currentY = addProfessionalTable(
+          doc,
+          {
+            title: 'Detailed Transactions',
+            head: ['Date', 'Type', 'Account(s)', 'Details', 'Source', 'Amount', 'Notes'],
+            body: flowsBody,
+            columnStyles: {
+              5: { halign: 'right', fontStyle: 'bold' },
+            },
+            alternateRows: true,
+          },
+          currentY
+        )
+      } catch (err) {
+        console.error('Failed while adding table to PDF document', err)
+        throw err
+      }
 
       const accountSlug = filters.accountId ? slugify(accountFilterLabel) : 'all'
-      doc.save(`${slugify(project.name)}-${accountSlug}-statement.pdf`)
-      toast.success('Statement exported as PDF')
+
+      try {
+        savePDF(doc, `${slugify(project.name)}-${accountSlug}-statement`)
+        toast.success('Statement exported as PDF')
+      } catch (err) {
+        console.error('Failed to save PDF', err)
+        throw err
+      }
     } catch (error) {
-      console.error(error)
-      toast.error('Failed to generate PDF statement')
+      console.error('PDF export failed', error)
+      toast.error(`Failed to generate PDF statement${error instanceof Error ? `: ${error.message}` : ''}`)
     } finally {
       setExporting(false)
     }
@@ -641,13 +540,14 @@ export default function ConstructionProjectStatementPage() {
                   <th className="px-3 py-2 text-right">Amount</th>
                   <th className="px-3 py-2">Account(s)</th>
                   <th className="px-3 py-2">Details</th>
+                  <th className="px-3 py-2">Source</th>
                   <th className="px-3 py-2">Notes</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/60">
                 {filteredFlows.length === 0 ? (
                   <tr>
-                    <td className="px-3 py-6 text-center text-xs text-muted-foreground" colSpan={6}>
+                    <td className="px-3 py-6 text-center text-xs text-muted-foreground" colSpan={7}>
                       No entries match the selected filters.
                     </td>
                   </tr>
@@ -723,6 +623,15 @@ export default function ConstructionProjectStatementPage() {
                           )}
                         </td>
                         <td className="px-3 py-2 text-muted-foreground">
+                          {flow.type === 'payment-in' && flow.inflowSource ? (
+                            <span className="inline-block rounded-md bg-cyan-100 px-2.5 py-1.5 text-xs font-semibold text-cyan-900 border border-cyan-300">
+                              ✓ {getInflowSourceLabel(flow.inflowSource)}
+                            </span>
+                          ) : (
+                            <span>--</span>
+                          )}
+                        </td>
+                        <td className="px-3 py-2 text-muted-foreground">
                           {flow.notes ? <p className="max-w-xs whitespace-pre-wrap">{flow.notes}</p> : <span>--</span>}
                         </td>
                       </tr>
@@ -766,11 +675,6 @@ function formatCountLabel(count: number, singular = 'entry', plural?: string) {
     (singular.endsWith('y') ? singular.slice(0, singular.length - 1) + 'ies' : `${singular}s`)
   const label = count === 1 ? singular : resolvedPlural
   return `${count} ${label}`
-}
-
-function formatDateTime(value: Date) {
-  const label = formatAppDateTime(value)
-  return label || value.toISOString()
 }
 
 function slugify(value: string) {

@@ -11,6 +11,7 @@ import { formatCurrency } from '../lib/format'
 import { formatAppDate, formatAppDateTime } from '../lib/date'
 import { cn } from '../lib/utils'
 import { getProjectProfile, summarizeProjectFlows } from '../services/projects'
+import { savePDF } from '../lib/pdfExport'
 import type { ProjectBankAccount, ProjectFlow, ProjectProfile } from '../types/projects'
 
 type CategoryAggregate = {
@@ -676,8 +677,7 @@ export default function ConstructionProjectReportPage() {
         }
       }
 
-      const filename = `${project.name.replace(/\s+/g, '-').toLowerCase()}-report.pdf`
-      doc.save(filename)
+      savePDF(doc, `${project.name}-report`)
     } catch (err) {
       console.error(err)
       toast.error('Unable to export report right now')

@@ -1,16 +1,16 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { useNavigate, useParams } from "react-router-dom"
 import { toast } from "sonner"
-import jsPDF from "jspdf"
-import autoTable from "jspdf-autotable"
 import { ArrowLeft, Download, RefreshCcw } from "lucide-react"
 
 import { Button } from "../components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card"
 import { formatCurrency } from "../lib/format"
-import { formatAppDate, formatAppDateTime } from "../lib/date"
+import { formatAppDate } from "../lib/date"
 import { cn } from "../lib/utils"
 import { getProjectProfile } from "../services/projects"
+import { createProfessionalPDF, addProfessionalTable, addSummarySection, savePDF } from "../lib/pdfExport"
+import { getInflowSourceLabel } from "../lib/inflowSources"
 import type { ProjectBankAccount, ProjectFlow, ProjectProfile } from "../types/projects"
 
 function formatDateDisplay(value?: string): string {
@@ -95,31 +95,50 @@ export default function ConstructionBankAccountStatementPage() {
 
   const handleExportPdf = () => {
     if (!account || !project) return
-    const doc = new jsPDF({ orientation: "landscape" })
-    doc.setFontSize(16)
-    doc.text(`${project.name} - ${account.label} statement`, 14, 20)
-    doc.setFontSize(11)
-    doc.text(`Generated: ${formatAppDateTime(new Date())}`, 14, 28)
-
-    const rows = flows.map((flow) => [
-      formatDateDisplay(flow.date),
-      flow.type === "payment-in" ? "Payment in" : flow.type === "payment-out" ? "Payment out" : "Transfer",
-      formatCurrency(Number(flow.amount) || 0),
-      flow.counterparty || "--",
-      flow.categoryName || flow.purpose || "--",
-      flow.type === "transfer"
-        ? `${flow.fromAccountName || "--"} -> ${flow.toAccountName || "--"}`
-        : flow.accountName || "--",
-      flow.notes || flow.purpose || "--",
-    ])
-
-    autoTable(doc, {
-      head: [["Date", "Type", "Amount", "Counterparty", "Category", "Account route", "Notes"]],
-      body: rows,
-      startY: 36,
+    
+    const doc = createProfessionalPDF({
+      title: `${project.name} - ${account.label}`,
+      subtitle: 'Bank Account Statement',
+      generatedAt: new Date(),
+      orientation: 'landscape',
     })
 
-    doc.save(`${account.label}-statement.pdf`)
+    // Add summary section
+    let currentY = 90
+    currentY = addSummarySection(doc, 'Summary', [
+      ['Net cash', formatCurrency(netCash)],
+      ['Payments in', formatCurrency(summary.paymentIn)],
+      ['Payments out', formatCurrency(summary.paymentOut)],
+      ['Transfers', formatCurrency(summary.transfers)],
+    ], currentY)
+
+    // Add flows table
+    if (flows.length > 0) {
+      currentY += 10
+      const body = flows.map((flow) => [
+        formatDateDisplay(flow.date),
+        flow.type === 'payment-in' ? 'Payment in' : flow.type === 'payment-out' ? 'Payment out' : 'Transfer',
+        formatCurrency(Number(flow.amount) || 0),
+        flow.type === 'payment-in' && flow.inflowSource ? getInflowSourceLabel(flow.inflowSource) : (flow.counterparty || '—'),
+        flow.type === 'payment-in' && flow.inflowSource ? getInflowSourceLabel(flow.inflowSource) : (flow.categoryName || flow.purpose || '—'),
+        flow.type === 'transfer'
+          ? `${flow.fromAccountName || '—'} → ${flow.toAccountName || '—'}`
+          : flow.accountName || '—',
+        flow.notes || flow.purpose || '—',
+      ])
+
+      addProfessionalTable(doc, {
+        title: 'Detailed Transactions',
+        head: ['Date', 'Type', 'Amount', 'Inflow Source / Counterparty', 'Category / Source', 'Account Route', 'Notes'],
+        body,
+        columnStyles: {
+          2: { halign: 'right', fontStyle: 'bold' },
+        },
+        alternateRows: true,
+      }, currentY)
+    }
+
+    savePDF(doc, `${account.label}-statement`)
   }
 
   if (loading && !project) {
@@ -200,14 +219,14 @@ export default function ConstructionBankAccountStatementPage() {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[760px] text-sm">
+              <table className="w-full min-w-[900px] text-sm">
                 <thead className="text-left text-xs uppercase text-muted-foreground">
                   <tr className="border-b border-border/60">
                     <th className="py-2 pr-3 font-medium">Date</th>
                     <th className="py-2 pr-3 font-medium">Type</th>
                     <th className="py-2 pr-3 font-medium">Amount</th>
                     <th className="py-2 pr-3 font-medium">Counterparty</th>
-                    <th className="py-2 pr-3 font-medium">Category</th>
+                    <th className="py-2 pr-3 font-medium">Category / Source</th>
                     <th className="py-2 pr-3 font-medium">Account route</th>
                     <th className="py-2 font-medium">Notes</th>
                   </tr>
@@ -236,12 +255,24 @@ export default function ConstructionBankAccountStatementPage() {
                       )}>
                         {formatCurrency(Number(flow.amount) || 0)}
                       </td>
-                      <td className="py-3 pr-3 text-muted-foreground">{flow.counterparty || "--"}</td>
-                      <td className="py-3 pr-3 text-muted-foreground">{flow.categoryName || flow.purpose || "--"}</td>
                       <td className="py-3 pr-3 text-muted-foreground">
-                        {flow.type === "transfer"
-                          ? `${flow.fromAccountName || "--"} -> ${flow.toAccountName || "--"}`
-                          : flow.accountName || "--"}
+                        {flow.type === "payment-in" && flow.inflowSource ? (
+                          <span className="inline-flex items-center rounded-full border border-cyan-200 bg-cyan-50 px-2.5 py-1 text-xs font-semibold text-cyan-700">
+                            {getInflowSourceLabel(flow.inflowSource)}
+                          </span>
+                        ) : (
+                          flow.counterparty || "--"
+                        )}
+                      </td>
+                      <td className="py-3 pr-3">
+                        <span className="text-muted-foreground">{flow.categoryName || flow.purpose || "--"}</span>
+                      </td>
+                      <td className="py-3 pr-3">
+                        <span className="text-muted-foreground">
+                          {flow.type === "transfer"
+                            ? `${flow.fromAccountName || "--"} -> ${flow.toAccountName || "--"}`
+                            : flow.accountName || "--"}
+                        </span>
                       </td>
                       <td className="py-3 text-muted-foreground">{flow.notes || flow.purpose || "--"}</td>
                     </tr>

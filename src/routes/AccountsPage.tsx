@@ -8,6 +8,7 @@ import { useTransfers } from '../hooks/useTransfers'
 import { useTransactions } from '../hooks/useTransactions'
 import { formatCurrency } from '../lib/format'
 import { formatAppDate } from '../lib/date'
+import { getInflowSourceLabel } from '../lib/inflowSources'
 import AddAccountForm from '../features/accounts/AddAccountForm'
 import type { Account } from '../types/accounts'
 import { Button } from '../components/ui/button'
@@ -19,6 +20,7 @@ type AccountSnapshot = {
   incomingTotal: number
   outgoingTotal: number
   lastActivity?: Date
+  topInflowSources?: { source: string; count: number }[]
 }
 
 type DashboardTotals = {
@@ -123,6 +125,21 @@ export default function AccountsPage() {
       if (direction === 'in') {
         summary.incomingTotal += amount
         summary.balance += amount
+        
+        // Track inflow sources for incoming transactions
+        if (tx.inflowSource) {
+          if (!summary.topInflowSources) {
+            summary.topInflowSources = []
+          }
+          const existingSource = summary.topInflowSources.find(
+            (s) => s.source === tx.inflowSource
+          )
+          if (existingSource) {
+            existingSource.count++
+          } else {
+            summary.topInflowSources.push({ source: tx.inflowSource, count: 1 })
+          }
+        }
       } else {
         summary.outgoingTotal += amount
         summary.balance -= amount
@@ -264,6 +281,7 @@ function HeroMetric({ icon: Icon, label, value, hint }: { icon: LucideIcon; labe
 
 function AccountCard({ snapshot }: { snapshot: AccountSnapshot }) {
   const balanceTone = snapshot.balance >= 0 ? 'text-emerald-600' : 'text-rose-600'
+  const topSources = snapshot.topInflowSources?.sort((a, b) => b.count - a.count).slice(0, 2) || []
 
   return (
     <Card className="border border-slate-200/70 bg-white/95 shadow-sm transition hover:-translate-y-[2px] hover:shadow-lg">
@@ -284,6 +302,24 @@ function AccountCard({ snapshot }: { snapshot: AccountSnapshot }) {
           <DetailRow label="Incoming" value={formatCurrency(snapshot.incomingTotal)} />
           <DetailRow label="Outgoing" value={formatCurrency(snapshot.outgoingTotal)} />
         </dl>
+
+        {topSources.length > 0 && (
+          <div className="border-t border-slate-200/50 pt-3">
+            <p className="text-xs font-semibold text-slate-600 uppercase tracking-wide mb-2">Top inflow sources</p>
+            <div className="flex flex-wrap gap-1.5">
+              {topSources.map((source) => (
+                <span
+                  key={source.source}
+                  className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700 border border-emerald-200"
+                >
+                  {getInflowSourceLabel(source.source)}
+                  <span className="text-emerald-600 font-semibold">({source.count})</span>
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div className="flex justify-end">
           <Button asChild size="sm" variant="outline" className="border-indigo-200 text-indigo-600 hover:bg-indigo-50 hover:text-indigo-700">
             <Link to={`/accounts/${snapshot.account.id}`}>View statement</Link>

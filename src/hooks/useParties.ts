@@ -9,7 +9,8 @@ export function useParties() {
 
   async function refetch() {
     setLoading(true)
-    const { data, error } = await supabase.from('parties').select('id,name,phone,notes').order('name')
+    // Fetch all fields needed for the new UI
+    const { data, error } = await supabase.from('parties').select('id,name,phone,email,address,type').order('name')
     if (error) setError(error.message)
     setData((data as any) || [])
     setLoading(false)

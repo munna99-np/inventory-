@@ -1,8 +1,6 @@
 import { useDeferredValue, useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import clsx from 'clsx'
-import jsPDF from 'jspdf'
-import autoTable from 'jspdf-autotable'
 import { ArrowDownLeft, ArrowLeft, ArrowUpRight, Download, FileText, RefreshCcw, TrendingUp } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useAccounts } from '../hooks/useAccounts'
@@ -12,7 +10,9 @@ import { useCategories } from '../hooks/useCategories'
 import { useParties } from '../hooks/useParties'
 import type { Transaction } from '../types/transactions'
 import { formatCurrency } from '../lib/format'
-import { formatAppDate, formatAppDateTime } from '../lib/date'
+import { formatAppDate } from '../lib/date'
+import { getInflowSourceLabel } from '../lib/inflowSources'
+import { createProfessionalPDF, addSummarySection, addProfessionalTable, savePDF, formatCurrencyForPDF, formatDateForPDF } from '../lib/pdfExport'
 import { Button } from '../components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Input } from '../components/ui/input'
@@ -25,6 +25,7 @@ type StatementRow = {
   counterparty: string
   notes?: string | null
   kind: 'transfer' | 'transaction'
+  inflowSource?: string | null
 }
 
 type StatementSummary = {
@@ -141,6 +142,7 @@ export default function AccountStatementPage() {
         counterparty,
         notes: tx.notes,
         kind: 'transaction',
+        inflowSource: tx.inflowSource ?? null,
       })
       transactionCount += 1
     }
@@ -217,82 +219,54 @@ export default function AccountStatementPage() {
   const handleDownloadPdf = () => {
     if (!account) return
 
-    const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' })
-    const marginLeft = 40
-    const marginTop = 60
-
-    doc.setFont('helvetica', 'bold')
-    doc.setFontSize(20)
-    doc.text(`${account.name} - Statement`, marginLeft, marginTop)
-
-    doc.setFont('helvetica', 'normal')
-    doc.setFontSize(11)
-    doc.setTextColor(80)
-    doc.text(`Generated on ${formatDateTime(new Date())}`, marginLeft, marginTop + 22)
-    doc.text(`Period: ${pdfPeriodLabel}`, marginLeft, marginTop + 40)
-    doc.text(
-      `Entries: ${summary.entryCount} (Transactions: ${summary.transactionCount}, Transfers: ${summary.transferCount})`,
-      marginLeft,
-      marginTop + 58,
-    )
-
-    autoTable(doc, {
-      startY: marginTop + 80,
-      theme: 'plain',
-      styles: { fontSize: 11, cellPadding: 6, textColor: [45, 55, 72] },
-      margin: { left: marginLeft, right: marginLeft },
-      columnStyles: {
-        0: { fontStyle: 'bold', textColor: [30, 41, 59] },
-        1: { halign: 'right' },
-      },
-      body: [
-        ['Opening balance', formatCurrency(summary.opening)],
-        ['Incoming', formatCurrency(summary.incomingTotal)],
-        ['Outgoing', formatCurrency(summary.outgoingTotal)],
-        ['Net movement', formatCurrency(summary.net)],
-        ['Closing balance', formatCurrency(summary.balance)],
-      ],
+    // Create professional PDF document
+    const doc = createProfessionalPDF({
+      title: `${account.name} - Account Statement`,
+      subtitle: `Period: ${pdfPeriodLabel}`,
+      generatedAt: new Date(),
+      orientation: 'landscape',
     })
 
-    const docAny = doc as any
-    const nextY = (docAny.lastAutoTable?.finalY ?? marginTop + 80) + 24
+    // Add summary section with key metrics
+    let currentY = 90
+    currentY = addSummarySection(doc, 'Summary', [
+      ['Opening Balance', formatCurrencyForPDF(summary.opening)],
+      ['Incoming Total', formatCurrencyForPDF(summary.incomingTotal)],
+      ['Outgoing Total', formatCurrencyForPDF(summary.outgoingTotal)],
+      ['Net Movement', formatCurrencyForPDF(summary.net)],
+      ['Closing Balance', formatCurrencyForPDF(summary.balance)],
+      ['Activity Count', `${summary.entryCount} entries (${summary.transactionCount} tx, ${summary.transferCount} transfers)`],
+    ], currentY)
 
-    if (timeline.length === 0) {
-      doc.setTextColor(100)
-      doc.text('No activity recorded in this period.', marginLeft, nextY)
-    } else {
-      autoTable(doc, {
-        startY: nextY,
-        margin: { left: marginLeft, right: marginLeft },
-        head: [['Date', 'Direction', 'Counterparty', 'Amount', 'Notes']],
-        body: timeline.map((row) => [
-          formatDateDisplay(row.date),
-          row.direction === 'in' ? 'Incoming' : 'Outgoing',
-          row.counterparty,
-          formatCurrency(row.amount),
-          row.notes || '',
-        ]),
-        styles: { fontSize: 10, cellPadding: 6, textColor: [44, 62, 80] },
-        headStyles: { fillColor: [76, 92, 205], textColor: 255, fontStyle: 'bold' },
-        alternateRowStyles: { fillColor: [245, 247, 255] },
-        columnStyles: { 3: { halign: 'right' } },
-        didParseCell: (data) => {
-          if (data.section === 'body') {
-            const dir = data.table.body[data.row.index]?.cells?.[1]?.text?.[0]
-            const isIncoming = dir === 'Incoming'
-            // Amount column index 3
-            if (data.column.index === 3) {
-              data.cell.styles.textColor = isIncoming ? [16, 128, 67] : [220, 38, 38]
-              data.cell.text = [
-                `${isIncoming ? '+' : '-'}${data.cell.text?.[0] ?? ''}`,
-              ]
-            }
-          }
+    // Add activity table if there are entries
+    if (timeline.length > 0) {
+      currentY += 10
+
+      const body = timeline.map((row) => [
+        formatDateForPDF(row.date),
+        row.direction === 'in' ? '↓ In' : '↑ Out',
+        row.counterparty,
+        formatCurrencyForPDF(row.amount),
+        row.notes || '—',
+      ])
+
+      currentY = addProfessionalTable(doc, {
+        title: 'Account Activity',
+        head: ['Date', 'Direction', 'Counterparty', 'Amount', 'Notes'],
+        body,
+        columnStyles: {
+          0: { halign: 'center', fontStyle: 'normal' },
+          1: { halign: 'center' },
+          2: { halign: 'left' },
+          3: { halign: 'right', fontStyle: 'bold' },
+          4: { halign: 'left' },
         },
-      })
+        alternateRows: true,
+      }, currentY)
     }
 
-    doc.save(`${slugify(account.name)}-statement.pdf`)
+    // Save the PDF with professional filename
+    savePDF(doc, `${account.name}-statement`)
   }
 
   if (!account && !accountsLoading) {
@@ -509,6 +483,7 @@ function StatementStat({
 function StatementTimelineRow({ row }: { row: StatementRow }) {
   const incoming = row.direction === 'in'
   const typeLabel = row.kind === 'transfer' ? 'Transfer' : 'Transaction'
+  const inflowSourceLabel = incoming && row.inflowSource ? getInflowSourceLabel(row.inflowSource as any) : null
 
   return (
     <div className="flex items-center gap-4 rounded-2xl border border-slate-200/70 bg-white/95 px-4 py-3 shadow-sm transition hover:border-indigo-200">
@@ -521,6 +496,11 @@ function StatementTimelineRow({ row }: { row: StatementRow }) {
             <p className="truncate text-sm font-semibold text-slate-900">{row.counterparty}</p>
             <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
               <span className="rounded-full border border-slate-200 px-2 py-[1px] uppercase tracking-wide">{typeLabel}</span>
+              {inflowSourceLabel && (
+                <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-[1px] text-emerald-700">
+                  {inflowSourceLabel}
+                </span>
+              )}
               <span>{formatDateDisplay(row.date)}</span>
             </div>
           </div>
@@ -570,15 +550,4 @@ function formatDateDisplay(value: Date | string) {
   const label = formatAppDate(value)
   if (label) return label
   return value instanceof Date ? value.toString() : String(value)
-}
-
-function formatDateTime(value: Date | string) {
-  const label = formatAppDateTime(value)
-  if (label) return label
-  return value instanceof Date ? value.toString() : String(value)
-}
-
-function slugify(value: string) {
-  const cleaned = value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
-  return cleaned || 'account'
 }

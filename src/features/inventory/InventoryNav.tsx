@@ -76,7 +76,8 @@ export default function InventoryNav() {
 
   return (
     <>
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="space-y-4">
+        {/* Navigation Tabs */}
         <div className="inline-flex items-center gap-1 border rounded-md p-1 bg-muted/40">
           {tabs.map((tab) => (
             <TabLink
@@ -94,36 +95,38 @@ export default function InventoryNav() {
             />
           ))}
         </div>
-        <div className="flex flex-wrap items-center gap-2">
+
+        {/* Action Buttons - Professional Spacing */}
+        <div className="flex items-center gap-3 overflow-x-auto">
           <Button
             type="button"
             variant="outline"
             size="sm"
-            className="border-indigo-200 text-indigo-600 hover:bg-indigo-50 hover:text-indigo-700"
+            className="border-indigo-200 text-indigo-600 hover:bg-indigo-50 hover:text-indigo-700 transition-all duration-200 whitespace-nowrap"
             onClick={() => setSaleOpen(true)}
           >
-            <ShoppingCart className="mr-2 h-4 w-4" />
-            Record sale
+            <ShoppingCart className="mr-2.5 h-4 w-4" />
+            <span>Record sale</span>
           </Button>
           <Button
             type="button"
             variant="outline"
             size="sm"
-            className="border-sky-200 text-sky-600 hover:bg-sky-50 hover:text-sky-700"
+            className="border-sky-200 text-sky-600 hover:bg-sky-50 hover:text-sky-700 transition-all duration-200 whitespace-nowrap"
             onClick={() => setLedgerOpen(true)}
           >
-            <UserRound className="mr-2 h-4 w-4" />
-            Customers
+            <UserRound className="mr-2.5 h-4 w-4" />
+            <span>Customers</span>
           </Button>
           <Button
             type="button"
             variant="outline"
             size="sm"
-            className="border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-700"
+            className="border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-700 transition-all duration-200 whitespace-nowrap"
             onClick={() => setHistoryOpen(true)}
           >
-            <ReceiptText className="mr-2 h-4 w-4" />
-            Invoice history
+            <ReceiptText className="mr-2.5 h-4 w-4" />
+            <span>Invoice history</span>
           </Button>
         </div>
       </div>

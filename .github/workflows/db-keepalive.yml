@@ -1,0 +1,25 @@
+name: DB keepalive
+
+on:
+  schedule:
+    # Runs every 2 days at 00:00 UTC
+    - cron: '0 0 */2 * *'
+  workflow_dispatch: {}
+
+jobs:
+  keepalive:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install dependencies
+        run: npm ci
+      - name: Run DB keepalive script
+        env:
+          # Configure these in the repository Secrets: SUPABASE_URL and SUPABASE_KEY
+          VITE_SUPABASE_URL: ${https://qbjqswzjzcmygdlbhxlg.supabase.co }}
+          VITE_SUPABASE_ANON_KEY: ${eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFianFzd3pqemNteWdkbGJoeGxnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY4MTg5MTgsImV4cCI6MjA3MjM5NDkxOH0.YlK_wK5eFan-x6CX7ZQL9umHPDGkfRE7A6o-9xl2jnw }}
+        run: node scripts/db-keepalive.js

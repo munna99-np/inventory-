@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { formatAppDate, formatAppDateTime } from "../lib/date"
 import { formatCurrency } from "../lib/format"
 import { cn } from "../lib/utils"
+import { savePDF } from "../lib/pdfExport"
 import {
   getProjectProfile,
   getTenderAnalysis,
@@ -713,8 +714,7 @@ export default function ConstructionProjectReportDrilldownPage() {
         doc.text(`+ ${remaining} more transaction${remaining === 1 ? "" : "s"} not shown in this summary.`, margin, cursorY)
       }
 
-      const filename = `${project.name.replace(/\s+/g, "-").toLowerCase()}-${scope}-drilldown.pdf`
-      doc.save(filename)
+      savePDF(doc, `${project.name}-${scope}-drilldown`)
     } catch (err) {
       console.error(err)
       toast.error("Unable to export drilldown right now")

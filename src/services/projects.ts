@@ -216,6 +216,7 @@ function ensureFlowDefaults(flow: ProjectFlow): ProjectFlow {
     categoryName: sanitizeString(flow.categoryName),
     purpose: sanitizeString(flow.purpose),
     notes: sanitizeString(flow.notes),
+    inflowSource: flow.inflowSource,
     createdAt,
     updatedAt,
   }
@@ -239,6 +240,7 @@ function createFlowFromInput(input: ProjectFlowInput): ProjectFlow {
     categoryName: input.categoryName,
     purpose: input.purpose,
     notes: input.notes,
+    inflowSource: input.inflowSource,
     createdAt: now(),
     updatedAt: now(),
   })
@@ -262,6 +264,7 @@ function updateFlowWithInput(flow: ProjectFlow, changes: Partial<ProjectFlowInpu
     categoryName: changes.categoryName !== undefined ? changes.categoryName : flow.categoryName,
     purpose: changes.purpose !== undefined ? changes.purpose : flow.purpose,
     notes: changes.notes !== undefined ? changes.notes : flow.notes,
+    inflowSource: changes.inflowSource !== undefined ? changes.inflowSource : flow.inflowSource,
     updatedAt: now(),
   })
 }
@@ -354,7 +357,12 @@ async function readLocalProfiles(): Promise<ProjectProfile[]> {
   try {
     const key = await getUserStorageKey()
     const raw = storage.getItem(key)
-    if (!raw) return []
+    if (!raw) {
+      // Try to recover/migrate legacy data into the current key
+      const migrated = await migrateLegacyProfiles()
+      if (migrated && migrated.length > 0) return migrated.map((item) => ensureProfileDefaults(item))
+      return []
+    }
     const parsed = JSON.parse(raw)
     if (!Array.isArray(parsed)) return []
     return parsed.map((item: ProjectProfile) => ensureProfileDefaults(item))
@@ -363,11 +371,68 @@ async function readLocalProfiles(): Promise<ProjectProfile[]> {
   }
 }
 
+// Attempt to migrate legacy/local copies of project profiles into the current
+// storage key. This helps when the app version changes the storage key name
+// (for example adding a :v1 suffix or appending a user id) so users don't
+// lose their locally stored profiles after an update.
+async function migrateLegacyProfiles(): Promise<ProjectProfile[] | null> {
+  const storage = getStorage()
+  if (!storage) return null
+  try {
+    const collected: Record<string, ProjectProfile> = {}
+    // Look for known legacy keys and any key that contains 'project-profiles'
+    for (let i = 0; i < storage.length; i++) {
+      const k = storage.key(i)
+      if (!k) continue
+      if (k === LEGACY_PROJECTS_KEY || k.includes('project-profiles')) {
+        try {
+          const raw = storage.getItem(k)
+          if (!raw) continue
+          const parsed = JSON.parse(raw)
+          if (!Array.isArray(parsed)) continue
+          parsed.forEach((p: any) => {
+            if (p && typeof p === 'object') {
+              const id = typeof p.id === 'string' ? p.id : null
+              const profile = ensureProfileDefaults(p as ProjectProfile)
+              // use existing id when available, otherwise generate
+              const keyId = id ?? profile.id
+              collected[keyId] = profile
+            }
+          })
+        } catch {
+          // ignore malformed entries
+        }
+      }
+    }
+
+    const values = Object.values(collected)
+    if (values.length === 0) return null
+
+    // Persist into the current storage key (use current user-specific key)
+    const targetKey = await getUserStorageKey()
+    try {
+      storage.setItem(targetKey, JSON.stringify(values.map((v) => ensureProfileDefaults(v))))
+    } catch {}
+    return values.map((v) => ensureProfileDefaults(v))
+  } catch {
+    return null
+  }
+}
+
 async function persistLocalProfiles(list: ProjectProfile[]) {
   const storage = getStorage()
   if (!storage) return
   try {
     const key = await getUserStorageKey()
+    // Keep a small backup of the previous value to reduce accidental data loss
+    try {
+      const prev = storage.getItem(key)
+      if (prev) {
+        try {
+          storage.setItem(`${key}:backup`, prev)
+        } catch {}
+      }
+    } catch {}
     storage.setItem(key, JSON.stringify(list.map((item) => ensureProfileDefaults(item))))
   } catch {}
 }
@@ -385,10 +450,90 @@ function emitProjectsUpdated() {
 }
 
 export async function listProjectProfiles(): Promise<ProjectProfile[]> {
+  // Try to fetch server-side profiles first (if Supabase configured & user authenticated),
+  // then merge with local profiles to support offline edits.
+  try {
+    const { data: { session } } = await supabase.auth.getSession()
+    const userId = session?.user?.id
+    if (userId) {
+      try {
+        const { data, error } = await supabase
+          .from('construction_projects')
+          .select('client_id, payload')
+          .eq('owner', userId)
+          .order('updated_at', { ascending: false })
+        if (!error && Array.isArray(data)) {
+          const serverProfiles: ProjectProfile[] = data
+            .map((r: any) => (r.payload ? ensureProfileDefaults(r.payload as ProjectProfile) : null))
+            .filter(Boolean) as ProjectProfile[]
+          // Merge with local edits (local takes precedence)
+          const local = await readLocalProfiles()
+          const mergedMap = new Map<string, ProjectProfile>()
+          serverProfiles.forEach((p) => mergedMap.set(p.id, ensureProfileDefaults(p)))
+          local.forEach((p) => mergedMap.set(p.id, ensureProfileDefaults(p)))
+          return sortProfiles(Array.from(mergedMap.values()))
+        }
+      } catch (err) {
+        // fallthrough to local
+      }
+    }
+  } catch {}
+
   return sortProfiles(await readLocalProfiles())
 }
 
+async function syncProfileToSupabase(profile: ProjectProfile): Promise<'supabase' | 'local'> {
+  try {
+    const clientId = profile.id
+    const payload = ensureProfileDefaults(profile)
+    const upsertData: Record<string, unknown> = {
+      client_id: clientId,
+      payload,
+    }
+    const { error } = await supabase
+      .from('construction_projects')
+      .upsert(upsertData, { onConflict: 'client_id' })
+      .select('client_id')
+      .single()
+    if (error) throw error
+    return 'supabase'
+  } catch (err) {
+    // keep local when any server error happens
+    return 'local'
+  }
+}
+
+async function deleteProfileFromSupabase(id: string): Promise<boolean> {
+  try {
+    // delete by client_id
+    const { error } = await supabase.from('construction_projects').delete().eq('client_id', id)
+    if (error) throw error
+    return true
+  } catch {
+    return false
+  }
+}
+
 export async function getProjectProfile(id: string): Promise<ProjectProfile | null> {
+  // Try server first (if user authenticated), fall back to local cache.
+  try {
+    const { data: { session } } = await supabase.auth.getSession()
+    const userId = session?.user?.id
+    if (userId) {
+      try {
+        const { data, error } = await supabase
+          .from('construction_projects')
+          .select('payload')
+          .eq('owner', userId)
+          .eq('client_id', id)
+          .single()
+        if (!error && data && data.payload) {
+          return ensureProfileDefaults(data.payload as ProjectProfile)
+        }
+      } catch {}
+    }
+  } catch {}
+
   const profiles = await readLocalProfiles()
   const found = profiles.find((p) => p.id === id)
   return found ? ensureProfileDefaults(found) : null
@@ -402,6 +547,13 @@ export async function createProjectProfile(input: CreateProjectProfileInput): Pr
   const next = [profile, ...profiles]
   await persistLocalProfiles(next)
   emitProjectsUpdated()
+  // Try to sync to server in background. If it fails, we keep local copy.
+  try {
+    const stored = await syncProfileToSupabase(profile)
+    if (stored === 'supabase') {
+      // Optionally we could mark storage source; for now, local copy stays and server is authoritative when online
+    }
+  } catch {}
   return profile
 }
 
@@ -436,14 +588,25 @@ export async function updateProjectProfile(
   profiles[idx] = ensureProfileDefaults(next)
   await persistLocalProfiles(profiles)
   emitProjectsUpdated()
+  // Best-effort: mirror update to server in background (fire-and-forget with error handling)
+  syncProfileToSupabase(profiles[idx]).catch(() => {
+    // Silently ignore server sync failures; local copy is always the source of truth
+  })
+
   return profiles[idx]
 }
+
+// Note: update/create/delete already trigger best-effort background syncs.
 
 export async function deleteProjectProfile(id: string): Promise<ProjectProfile[]> {
   const profiles = await readLocalProfiles()
   const filtered = profiles.filter((p) => p.id !== id)
   await persistLocalProfiles(filtered)
   emitProjectsUpdated()
+  // Best-effort: delete from server as well
+  deleteProfileFromSupabase(id).catch(() => {
+    // Silently ignore server delete failures
+  })
   return sortProfiles(filtered)
 }
 

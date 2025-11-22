@@ -1,6 +1,8 @@
+/* stylelint-disable at-rule-no-unknown */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+/* stylelint-enable at-rule-no-unknown */
 
 :root {
   color-scheme: light;
@@ -42,4 +44,34 @@ html, body, #root {
 
 body {
   @apply bg-background text-foreground;
+}
+
+/* Smooth scrolling and touch / mobile optimizations */
+html {
+  /* Respect user preference for reduced motion */
+  scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}
+
+body {
+  /* Momentum scrolling on iOS / mobile browsers */
+  -webkit-overflow-scrolling: touch;
+  /* Improve touch responsiveness for common gestures */
+  touch-action: manipulation;
+  /* Prevent scroll chaining when appropriate */
+  overscroll-behavior-y: contain;
+}
+
+/* Make scrollable lists feel smoother on smaller devices */
+.touch-scrollable {
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
 }

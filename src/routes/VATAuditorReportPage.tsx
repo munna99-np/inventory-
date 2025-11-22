@@ -2,9 +2,9 @@ import { useEffect, useMemo, useState } from 'react'
 import { Button } from '../components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { formatCurrency as baseFormatCurrency } from '../lib/format'
+import { listBillingHistory, listPurchases } from '../services/inventoryItems'
 import { download } from '../lib/csv'
-import jsPDF from 'jspdf'
-import autoTable from 'jspdf-autotable'
+import { createProfessionalPDF, addProfessionalTable, addSummarySection, savePDF } from '../lib/pdfExport'
 
 type SaleRow = { id: string; date: string; customer: string; subTotal: number }
 type PurchaseRow = { id: string; date: string; supplier: string; subTotal: number }
@@ -77,61 +77,31 @@ export default function VATAuditorReportPage() {
     setLoading(true)
     setError(null)
     try {
-      const base = (import.meta as any).env?.VITE_API_BASE || ''
-      const makeUrl = (path: string, withYear = true) => withYear ? `${base}${path}?year=${year}` : `${base}${path}`
-      const safeJson = async (res: Response, label: string) => {
-        if (!res.ok) throw new Error(`${label} HTTP ${res.status}`)
-        const ct = res.headers.get('content-type') || ''
-        const text = await res.text()
-        if (!/application\/json/i.test(ct)) {
-          const snippet = text.slice(0, 120).replace(/\s+/g, ' ')
-          throw new Error(`${label} responded non-JSON. Hint: ${snippet}`)
-        }
-        try {
-          return JSON.parse(text)
-        } catch (e) {
-          throw new Error(`${label} invalid JSON`)
-        }
-      }
-
-      // Fallback candidates to handle different backends: with/without year, api prefix, pluralization
-      const salesCandidates = [
-        makeUrl('/inventory/sales', true),
-        makeUrl('/inventory/sales', false),
-        makeUrl('/api/inventory/sales', true),
-        makeUrl('/api/inventory/sales', false),
-        makeUrl('/inventory/sale', true),
-        makeUrl('/inventory/sale', false),
-      ]
-      const purchaseCandidates = [
-        makeUrl('/inventory/purchases', true),
-        makeUrl('/inventory/purchases', false),
-        makeUrl('/api/inventory/purchases', true),
-        makeUrl('/api/inventory/purchases', false),
-        makeUrl('/inventory/purchase', true),
-        makeUrl('/inventory/purchase', false),
-      ]
-
-      const fetchWithFallback = async (label: 'Sales API' | 'Purchases API', candidates: string[]) => {
-        const errors: string[] = []
-        for (const url of candidates) {
-          try {
-            const res = await fetch(url, { headers: { Accept: 'application/json' } })
-            return await safeJson(res, label)
-          } catch (e: any) {
-            errors.push(`${url}: ${e?.message || 'error'}`)
-            continue
-          }
-        }
-        throw new Error(`${label} failed. Tried: ${errors.join(' | ')}`)
-      }
-
-      const [salesJson, purchasesJson] = await Promise.all([
-        fetchWithFallback('Sales API', salesCandidates),
-        fetchWithFallback('Purchases API', purchaseCandidates),
+      // Use existing Supabase-backed services for sales (billing history) and purchases.
+      // The project schema doesn't include a dedicated sales table; sales are stored as invoices
+      // (inventory_sale_invoices) and purchases in inventory_purchases. Use the services to
+      // fetch data and map them into the shape expected by this page.
+      const [billingResult, purchasesResult] = await Promise.all([
+        listBillingHistory({ limit: 1000 }),
+        listPurchases(),
       ])
-      setSales(Array.isArray(salesJson) ? salesJson : [])
-      setPurchases(Array.isArray(purchasesJson) ? purchasesJson : [])
+
+      const salesMapped: SaleRow[] = (billingResult.rows || []).map((r) => ({
+        id: r.id,
+        date: String(r.invoiceDate || r.createdAt || new Date().toISOString()),
+        customer: r.partyName || 'Walk-in customer',
+        subTotal: Number(r.totalAmount || 0),
+      }))
+
+      const purchasesMapped: PurchaseRow[] = (purchasesResult || []).map((p: any) => ({
+        id: String(p.id),
+        date: String(p.purchase_date || p.created_at || new Date().toISOString()),
+        supplier: p.party?.name || '',
+        subTotal: Number(p.total_amount || 0),
+      }))
+
+      setSales(salesMapped)
+      setPurchases(purchasesMapped)
     } catch (e: any) {
       setError(e?.message || 'Failed to load data')
       setSales([])
@@ -234,27 +204,31 @@ export default function VATAuditorReportPage() {
   }
 
   function exportPdf() {
-    const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' })
-    doc.setFontSize(14)
-    doc.text(`VAT Auditor Report - ${year}`, 40, 32)
-    autoTable(doc, {
-      startY: 48,
-      head: [[
-        'Month', 'Sales (NPR)', 'Output VAT', 'Purchases (NPR)', 'Input VAT', 'Net VAT', 'Remark', 'Due date', 'Status',
-      ]],
-      body: monthRows.map((r) => [
-        r.label,
-        formatNPR(r.sales),
-        formatNPR(r.outputVat),
-        formatNPR(r.purchases),
-        formatNPR(r.inputVat),
-        formatNPR(r.netVat),
-        r.remark,
-        r.dueDate,
-        r.filingStatus,
-      ]),
-      styles: { fontSize: 9 },
-      headStyles: { fillColor: [59, 130, 246] },
+    const doc = createProfessionalPDF({
+      title: `VAT Auditor Report - ${year}`,
+      subtitle: 'Monthly VAT Computation with IRD Compliance',
+      generatedAt: new Date(),
+      orientation: 'landscape',
+    })
+
+    // Add monthly table
+    let currentY = 90
+    const monthBody = monthRows.map((r) => [
+      r.label,
+      formatNPR(r.sales),
+      formatNPR(r.outputVat),
+      formatNPR(r.purchases),
+      formatNPR(r.inputVat),
+      formatNPR(r.netVat),
+      r.remark,
+      r.dueDate,
+      r.filingStatus,
+    ])
+
+    currentY = addProfessionalTable(doc, {
+      title: 'Monthly Report',
+      head: ['Month', 'Sales (NPR)', 'Output VAT', 'Purchases (NPR)', 'Input VAT', 'Net VAT', 'Remark', 'Due Date', 'Status'],
+      body: monthBody,
       columnStyles: {
         1: { halign: 'right' },
         2: { halign: 'right' },
@@ -262,21 +236,21 @@ export default function VATAuditorReportPage() {
         4: { halign: 'right' },
         5: { halign: 'right' },
       },
-    })
-    autoTable(doc, {
-      startY: (doc as any).lastAutoTable.finalY + 16,
-      head: [[ 'Annual Summary', '', '', '', '' ]],
-      body: [
-        ['Total Sales', formatNPR(yearly.totalSales), 'Total Purchases', formatNPR(yearly.totalPurchases), ''],
-        ['Total Output VAT', formatNPR(yearly.totalOutput), 'Total Input VAT', formatNPR(yearly.totalInput), ''],
-        ['Net VAT', formatNPR(yearly.net), yearly.net < 0 ? 'VAT Credit (Carried Forward)' : '', '', ''],
-      ],
-      styles: { fontSize: 9 },
-      headStyles: { fillColor: [99, 102, 241] },
-      columnStyles: { 1: { halign: 'right' }, 3: { halign: 'right' } },
-      theme: 'striped',
-    })
-    doc.save(`vat_auditor_${year}.pdf`)
+      alternateRows: true,
+    }, currentY)
+
+    // Add yearly summary
+    currentY += 15
+    currentY = addSummarySection(doc, 'Annual Summary', [
+      ['Total Sales', formatNPR(yearly.totalSales)],
+      ['Total Purchases', formatNPR(yearly.totalPurchases)],
+      ['Total Output VAT', formatNPR(yearly.totalOutput)],
+      ['Total Input VAT', formatNPR(yearly.totalInput)],
+      ['Net VAT', formatNPR(yearly.net)],
+      [yearly.net < 0 ? 'VAT Credit (Carry Forward)' : 'VAT Payable', formatNPR(Math.abs(yearly.net))],
+    ], currentY)
+
+    savePDF(doc, `vat_auditor_${year}`)
   }
 
   const years = useMemo(() => {

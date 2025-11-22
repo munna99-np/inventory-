@@ -18,7 +18,9 @@ import { useCategories } from '../hooks/useCategories'
 import { formatCurrency } from '../lib/format'
 import { formatAppDate, formatAppDateTime } from '../lib/date'
 import { download, toCsv } from '../lib/csv'
+import { INFLOW_SOURCE_GROUPS, getInflowSourceLabel } from '../lib/inflowSources'
 import type { Transaction } from '../types/transactions'
+import type { InflowSource } from '../types/projects'
 
 type Segment = 'all' | 'received' | 'transfer' | 'payment' | 'withdraw'
 type RangePreset = '7' | '30' | '90' | 'all' | 'custom'
@@ -96,6 +98,7 @@ export default function TransactionsPage() {
   const [to, setTo] = useState(() => toISODate(new Date()))
   const [detailsOpen, setDetailsOpen] = useState(false)
   const [selectedTx, setSelectedTx] = useState<TransactionWithMeta | null>(null)
+  const [selectedInflowSource, setSelectedInflowSource] = useState<InflowSource | ''>('')
 
   const { data: accounts } = useAccounts()
   const { data: parties } = useParties()
@@ -148,9 +151,11 @@ export default function TransactionsPage() {
       if (segment === 'withdraw') return isWithdraw(tx)
       if (segment === 'payment') return tx.direction === 'out' && !isWithdraw(tx)
       if (selectedCategoryId) return tx.category_id === selectedCategoryId
+      if (selectedInflowSource && tx.direction === 'in') return (tx as any).inflowSource === selectedInflowSource
+      if (selectedInflowSource && tx.direction !== 'in') return false
       return true
     })
-  }, [decorated, segment, selectedCategoryId])
+  }, [decorated, segment, selectedCategoryId, selectedInflowSource])
 
   const categoryTreeItems = useMemo<CategoryTreeItem[]>(() => {
     const byParent = new Map<string | null, { id: string; name: string; parent_id?: string | null }[]>()
@@ -204,6 +209,7 @@ export default function TransactionsPage() {
     const start = subDays(end, 29)
     setFrom(toISODate(start))
     setTo(toISODate(end))
+    setSelectedInflowSource('')
     refetch()
   }
 
@@ -283,6 +289,23 @@ export default function TransactionsPage() {
               <option value="all">All scopes</option>
               <option value="personal">Personal</option>
               <option value="work">Work</option>
+            </select>
+            <span className="text-sm text-muted-foreground">Inflow Source:</span>
+            <select
+              className="h-10 min-w-[200px] rounded-md border border-input bg-white px-3 text-sm shadow-sm focus:outline-none"
+              value={selectedInflowSource}
+              onChange={(event) => setSelectedInflowSource(event.target.value as InflowSource | '')}
+            >
+              <option value="">All sources</option>
+              {Object.entries(INFLOW_SOURCE_GROUPS).map(([category, sources]) => (
+                <optgroup key={category} label={category}>
+                  {sources.map((source: any) => (
+                    <option key={source.value} value={source.value}>
+                      {source.label}
+                    </option>
+                  ))}
+                </optgroup>
+              ))}
             </select>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -386,6 +409,7 @@ export default function TransactionsPage() {
                 <th className="px-6 py-3 text-left">Flow</th>
                 <th className="px-6 py-3 text-right">Amount</th>
                 <th className="px-6 py-3 text-left">Category</th>
+                <th className="px-6 py-3 text-left">Source</th>
                 <th className="px-6 py-3 text-left">Notes</th>
                 <th className="px-6 py-3 text-right">Action</th>
               </tr>
@@ -393,12 +417,12 @@ export default function TransactionsPage() {
             <tbody>
               {loading && (
                 <tr>
-                  <td className="px-6 py-6 text-center text-muted-foreground" colSpan={7}>Loading transactions...</td>
+                  <td className="px-6 py-6 text-center text-muted-foreground" colSpan={8}>Loading transactions...</td>
                 </tr>
               )}
               {!loading && filtered.length === 0 && (
                 <tr>
-                  <td className="px-6 py-6 text-center text-muted-foreground" colSpan={7}>No transactions found for the selected filters.</td>
+                  <td className="px-6 py-6 text-center text-muted-foreground" colSpan={8}>No transactions found for the selected filters.</td>
                 </tr>
               )}
               {!loading && filtered.map((tx) => {
@@ -433,6 +457,15 @@ export default function TransactionsPage() {
                       <span className="ml-2 text-xs font-medium uppercase">{badgeLabel}</span>
                     </td>
                     <td className="px-6 py-4">{tx.categoryName || 'Uncategorised'}</td>
+                    <td className="px-6 py-4">
+                      {flow.kind === 'credit' && (tx as any).inflowSource ? (
+                        <span className="inline-flex items-center rounded-full border border-cyan-200 bg-cyan-50 px-2.5 py-1 text-xs font-semibold text-cyan-700">
+                          {getInflowSourceLabel((tx as any).inflowSource)}
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground">--</span>
+                      )}
+                    </td>
                     <td className="px-6 py-4 text-muted-foreground">{tx.notes || 'N/A'}</td>
                     <td className="px-6 py-4 text-right">
                       <Button size="sm" variant="outline" className="rounded-lg" onClick={() => openDetails(tx)}>Details</Button>

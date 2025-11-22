@@ -10,7 +10,8 @@ import MoneyInput from '../components/fields/MoneyInput'
 import { formatCurrency } from '../lib/format'
 import { formatAppDate } from '../lib/date'
 import { getProjectProfile, recordProjectFlow } from '../services/projects'
-import type { ProjectProfile } from '../types/projects'
+import type { ProjectProfile, InflowSource } from '../types/projects'
+import { INFLOW_SOURCE_GROUPS, getInflowSourceLabel } from '../lib/inflowSources'
 import { TextField } from '@mui/material'
 
 type FormState = {
@@ -19,6 +20,7 @@ type FormState = {
   date: string
   counterparty: string
   notes: string
+  inflowSource?: InflowSource
 }
 
 function todayIso(): string {
@@ -102,6 +104,7 @@ export default function ConstructionPaymentInPage() {
         accountName: account?.label,
         counterparty: form.counterparty.trim() || undefined,
         notes: form.notes.trim() || undefined,
+        inflowSource: form.inflowSource,
       })
       setProject(updated)
       toast.success('Payment in recorded')
@@ -192,7 +195,38 @@ export default function ConstructionPaymentInPage() {
               <FormField label="Counterparty">
                 <Input value={form.counterparty} onChange={(event) => setForm((prev) => ({ ...prev, counterparty: event.target.value }))} placeholder="Customer or source" />
               </FormField>
+              <FormField label="Inflow Source" className="md:col-span-2">
+                <select
+                  value={form.inflowSource || ''}
+                  onChange={(event) => setForm((prev) => ({ ...prev, inflowSource: event.target.value as InflowSource || undefined }))}
+                  className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <option value="">Select inflow source (optional)</option>
+                  {Object.entries(INFLOW_SOURCE_GROUPS).map(([group, sources]) => (
+                    <optgroup key={group} label={group}>
+                      {sources.map((source) => (
+                        <option key={source.value} value={source.value}>
+                          {source.label}
+                        </option>
+                      ))}
+                    </optgroup>
+                  ))}
+                </select>
+              </FormField>
             </div>
+
+            {/* Inflow Source Display Badge */}
+            {form.inflowSource && (
+              <div className="rounded-lg border-2 border-cyan-200 bg-cyan-50 p-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Selected Inflow Source</p>
+                <div className="flex items-center gap-2">
+                  <span className="inline-block rounded-md bg-cyan-100 px-3 py-2 text-sm font-semibold text-cyan-900">
+                    ✓ {getInflowSourceLabel(form.inflowSource)}
+                  </span>
+                </div>
+              </div>
+            )}
+
             <FormField label="Notes">
               <TextField
                 id="outlined-notes"
@@ -235,6 +269,7 @@ export default function ConstructionPaymentInPage() {
                     <th className="py-2 pr-3 font-medium">Date</th>
                     <th className="py-2 pr-3 font-medium">Account</th>
                     <th className="py-2 pr-3 font-medium">Amount</th>
+                    <th className="py-2 pr-3 font-medium">Source</th>
                     <th className="py-2 pr-3 font-medium">Counterparty</th>
                     <th className="py-2 font-medium">Notes</th>
                   </tr>
@@ -244,7 +279,16 @@ export default function ConstructionPaymentInPage() {
                     <tr key={flow.id} className="border-b border-border/60 last:border-b-0">
                       <td className="py-3 pr-3 text-muted-foreground">{formatDateDisplay(flow.date)}</td>
                       <td className="py-3 pr-3 text-muted-foreground">{flow.accountName || '--'}</td>
-                      <td className="py-3 pr-3 text-emerald-600">{formatCurrency(Number(flow.amount) || 0)}</td>
+                      <td className="py-3 pr-3 text-emerald-600 font-medium">{formatCurrency(Number(flow.amount) || 0)}</td>
+                      <td className="py-3 pr-3">
+                        {flow.inflowSource ? (
+                          <span className="inline-block rounded-md bg-cyan-50 px-2 py-1 text-xs font-medium text-cyan-700">
+                            {getInflowSourceLabel(flow.inflowSource)}
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground">--</span>
+                        )}
+                      </td>
                       <td className="py-3 pr-3 text-muted-foreground">{flow.counterparty || '--'}</td>
                       <td className="py-3 text-muted-foreground">{flow.notes || '--'}</td>
                     </tr>
@@ -262,11 +306,12 @@ export default function ConstructionPaymentInPage() {
 type FormFieldProps = {
   label: string
   children: React.ReactNode
+  className?: string
 }
 
-function FormField({ label, children }: FormFieldProps) {
+function FormField({ label, children, className }: FormFieldProps) {
   return (
-    <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
+    <label className={`flex flex-col gap-1 text-xs font-medium text-muted-foreground ${className || ''}`}>
       {label}
       {children}
     </label>
